@@ -123,18 +123,19 @@ def format_currency(value):
 # 4. 메인 화면 구성
 # --------------------------------------------------------------------------------
 def main():
-    st.title("💰 AI 가계부: 지출 재해석 & 패턴 분석") # [수정] 용어 통일
+    st.title("💰지출 재해석 및 패턴 분석을 실시하겠다.") 
 
     with st.sidebar:
         st.header("데이터 관리")
-        if st.button("🔄 최신 데이터 불러오기"):
+        if st.button("🔄 데이터 강제 동기화"):
+            st.cache_data.clear() # 혹시 모를 캐시 삭제
             st.rerun()
 
-    # 1. 데이터 로드
+    # 1. 데이터 로드 (페이지 열릴 때마다 무조건 실행됨)
     raw_df = load_and_process_data()
 
     if raw_df.empty:
-        st.warning("데이터가 없거나 DB 연결에 실패했습니다. utils/handle_sql 설정을 확인해주세요.")
+        st.warning("데이터가 없거나 DB 연결에 실패했다. utils/handle_sql 설정을 확인해보아라.")
         return
 
     # 2. 재해석 적용
@@ -145,10 +146,10 @@ def main():
 
     # --- TAB 1: 월별 리포트 ---
     with tab1:
-        st.subheader("📅 월별 지출 성격 분석") # [수정] 용어 통일
+        st.subheader("📅 월별 지출 성격 분석이다.") # [수정] 용어 통일
         
         all_months = sorted(df['month'].unique(), reverse=True)
-        selected_month = st.selectbox("분석할 월을 선택하세요", all_months)
+        selected_month = st.selectbox("분석할 월을 선택하라.", all_months)
         
         month_df = df[df['month'] == selected_month].copy()
         
@@ -258,7 +259,7 @@ def main():
 
 # [좌측] 상관관계 분석
         with col_left:
-            st.markdown("#### 📉 전력 누수(낭비)가 총 소모에 미치는 영향을 보아라!")
+            st.markdown("##### 📉 너의 낭비가 총 지출에 미치는 영향을 보여주겠다.")
             
             # 1. 데이터 집계
             monthly_agg = df.groupby("month").apply(
@@ -275,8 +276,8 @@ def main():
                 # 3. 산점도 시각화
                 fig_scatter = px.scatter(
                     monthly_agg, x="waste", y="total", text="month",
-                    labels={"waste": "전력 누수 (충동+나태)", "total": "총 탄약 소모"},
-                    title="전력 누수 vs 총 소모량 상관관계"
+                    labels={"waste": "낭비 (충동+나태)", "total": "총 지출"},
+                    title="낭비 vs 총 지출 상관관계"
                 )
                 try:
                     z = np.polyfit(monthly_agg["waste"], monthly_agg["total"], 1)
@@ -386,11 +387,11 @@ def main():
 
         # [우측] 히트맵 분석 (다중 선택)
         with col_right:
-            st.markdown("#### 🔥 언제 지출이 가장 많은지 보여주겠다!") # [수정] 문구 자연스럽게 변경
+            st.markdown("##### 🔥 언제 지출이 가장 많은지 보여주겠다.") # [수정] 문구 자연스럽게 변경
             
             filter_options = ["충동", "게으름", "호흡", "성장"]
             selected_types = st.multiselect(
-                "분석할 유형 선택 (복수 선택 가능)", 
+                "분석할 유형 선택하라. (복수 선택도 가능하다.)", 
                 options=filter_options, 
                 default=filter_options
             )
@@ -399,7 +400,7 @@ def main():
                 target_df = df[df["재해석"].isin(selected_types)]
             else:
                 target_df = pd.DataFrame()
-                st.warning("분석할 유형을 하나 이상 선택해주세요.")
+                st.warning("분석할 유형을 하나 이상 선택하여라.")
 
             if not target_df.empty:
                 heatmap_data = target_df.groupby(["weekday_name", "hour"])["비용"].sum().reset_index()
@@ -434,7 +435,7 @@ def main():
                 st.table(top3)
             
             elif selected_types:
-                st.warning(f"선택하신 유형에 해당하는 지출 내역이 없습니다.")
+                st.warning(f"선택한 유형에 해당하는 지출 내역이 없다.")
 
 if __name__ == "__main__":
     main()
