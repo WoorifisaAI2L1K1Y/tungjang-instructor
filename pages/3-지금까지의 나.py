@@ -302,36 +302,64 @@ def main():
 
 # --- TAB 2: 패턴 분석 ---
     with tab2:
+        # [수정됨] 지출 유형 정의 표 (st.columns로 가운데 정렬)
+        # 비율을 [1, 5, 1] 정도로 주어 양옆에 여백을 만듭니다.
+        # 테이블 너비가 좁다면 [1, 2, 1], 넓다면 [1, 8, 1] 등으로 조절하세요.
+        _, col_table, _ = st.columns([1, 5, 1])
+        
+        with col_table:
+            st.markdown("""
+            | 유형 | 정의 | 예시 | 판정 |
+            | :--- | :--- | :--- | :---: |
+            | **게으름** | 귀찮음과 편리함에 굴복하여 발생한 비용 | 배달음식, 택시, 연체료 | 🔴**낭비** |
+            | **충동** | 계획 없이 순간의 감정에 휘둘린 지출 | 카페, 홧김비용, 유흥, 술 | 🔴**낭비** |
+            | **호흡** | 생존과 생활 유지를 위해 반드시 필요한 비용 | 월세, 통신비, 식재료, 생필품 | 🔵**필수** |
+            | **성장** | 더 나은 미래의 나를 위한 투자 | 도서, 운동, 강의, 저축/투자 | 🟢**투자** |
+            """)
+
+        st.write("") # 약간의 여백
+        
+        st.write("") # 약간의 여백 추가
+
         st.subheader("🔍 지출 행동 패턴 분석이다!") 
         
-        col_left, col_right = st.columns(2)
+        # [이전 레이아웃 코드 유지] 상단: 설명(말풍선) 및 컨트롤(필터) 영역
+        col_upper_left, col_upper_right = st.columns(2)
 
-        # [좌측] 상관관계 분석
-        with col_left:
+        # ----------------------------------------------------------------
+        # 1. 상단 좌측: 텍스트 및 상태 말풍선
+        # ----------------------------------------------------------------
+        with col_upper_left:
             st.markdown("""
             ##### :red[낭비는 너가 게으르고, 충동 구매를 한 지출이다.]
             ##### 📉 아래는 너의 낭비가 총 지출에 미치는 영향이다!
             """)
-                        
-            # 1. 데이터 집계
+            
+            # 상관계수 계산을 위한 데이터 집계
             monthly_agg = df.groupby("month").apply(
                 lambda x: pd.Series({
                     "total": x["비용"].sum(),
-                    "waste": x[x["재해석"].isin(["충동", "나태"])]["비용"].sum()
+                    "waste": x[x["재해석"].isin(["충동", "게으름"])]["비용"].sum() 
                 })
             ).reset_index()
 
+            corr_value = 0 
             if len(monthly_agg) > 1:
-                # 2. 상관계수 계산
                 corr_value = monthly_agg['waste'].corr(monthly_agg['total'])
-                
 
-                script_dir = os.path.dirname(os.path.abspath(__file__)) 
-                root_dir = os.path.dirname(script_dir)                  
-                img_dir = os.path.join(root_dir, 'images')              
+            # 이미지 경로 및 상태 텍스트 설정
+            script_dir = os.path.dirname(os.path.abspath(__file__)) 
+            root_dir = os.path.dirname(script_dir)                  
+            img_dir = os.path.join(root_dir, 'images')              
 
-                val_html = f"<span style='color: #d63384; font-size: 1.1em;'>{corr_value:.2f}</span>"
+            val_html = f"<span style='color: #d63384; font-size: 1.1em;'>{corr_value:.2f}</span>"
+            
+            # 기본값
+            img_path = os.path.join(img_dir, '0-궁금.png')
+            bg_color = "#f8f9fa"
+            status_text = "데이터가 부족하다."
 
+            if len(monthly_agg) > 1:
                 if corr_value >= 0.7:
                     img_path = os.path.join(img_dir, '4-화남.png')
                     bg_color = "#ffeaea" 
@@ -349,62 +377,94 @@ def main():
                     bg_color = "#e2e3e5"
                     status_text = f"낭비를 줄였는데 지출이 늘어나는 <span style='color: #5f3dc4;'>역방향</span> 상관계수가 {val_html} 감지!<br>비상! 기현상이다. 정밀 타격이 필요하다! 😨"
 
-                col_img, col_bubble = st.columns([1, 2.5])
+            # 말풍선 렌더링
+            c_img, c_bubble = st.columns([1, 2.5])
+            with c_img:
+                if os.path.exists(img_path):
+                    st.image(img_path, use_container_width=True)
+                else:
+                    st.write("🪖")
+            
+            with c_bubble:
+                bubble_style = f"""
+                <style>
+                .speech-bubble {{
+                    position: relative; background: {bg_color}; border-radius: 12px; padding: 15px 20px;
+                    color: #333; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); margin-left: 10px;
+                    display: flex; align-items: center; min-height: 80px; border: 2px solid rgba(0,0,0,0.05);
+                }}
+                .speech-bubble:after {{
+                    content: ''; position: absolute; left: 0; top: 50%; width: 0; height: 0;
+                    border: 12px solid transparent; border-right-color: {bg_color}; border-left: 0;
+                    margin-top: -12px; margin-left: -12px;
+                }}
+                .bubble-text {{ font-size: 16px; font-weight: 600; line-height: 1.5; margin: 0; font-family: 'Malgun Gothic', sans-serif; }}
+                </style>
+                """
+                st.markdown(bubble_style, unsafe_allow_html=True)
+                st.markdown(f'<div class="speech-bubble"><p class="bubble-text">{status_text}</p></div>', unsafe_allow_html=True)
 
-                with col_img:
-                    if os.path.exists(img_path):
-                        st.image(img_path, use_container_width=True)
-                    else:
-                        st.error(f"이미지 경로 확인 필요: {img_path}")
-                        st.write("🪖") 
+        # ----------------------------------------------------------------
+        # 2. 상단 우측: 텍스트, 가이드 말풍선, 그리고 [필터]
+        # ----------------------------------------------------------------
+        with col_upper_right:
+            st.markdown("##### 🔥 언제 지출이 가장 많은지 보여주겠다.")
+            
+            # 가이드 말풍선 로직
+            img_path_guide = os.path.join(img_dir, '5-교관의_한마디.png')
+            bubble_bg_color = "#e7f5ff"
+            guide_text = "💡 <span style='color: #0b7285; font-weight: 600;'>히트맵 판별법</span>: 가로축은 <span style='color: #1c7ed6;'>시간</span>, 세로축은 <span style='color: #1c7ed6;'>요일</span>이다.<br>색이 <span style='color: #e03131;'>붉을수록</span> 해당 시간대에 지출이 극심하다는 뜻이다!"
 
-                with col_bubble:
-                    bubble_style = f"""
-                    <style>
-                    .speech-bubble {{
-                        position: relative;
-                        background: {bg_color};
-                        border-radius: 12px;
-                        padding: 15px 20px;
-                        color: #333;
-                        box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-                        margin-left: 10px;
-                        display: flex;
-                        align-items: center;
-                        min-height: 80px;
-                        border: 2px solid rgba(0,0,0,0.05);
-                    }}
-                    .speech-bubble:after {{
-                        content: '';
-                        position: absolute;
-                        left: 0;
-                        top: 50%;
-                        width: 0;
-                        height: 0;
-                        border: 12px solid transparent;
-                        border-right-color: {bg_color};
-                        border-left: 0;
-                        margin-top: -12px;
-                        margin-left: -12px;
-                    }}
-                    .bubble-text {{
-                        font-size: 16px; /* 우측과 통일 */
-                        font-weight: 600; /* 우측과 통일 (Bold 대신 600) */
-                        line-height: 1.5;
-                        margin: 0;
-                        font-family: 'Malgun Gothic', sans-serif;
-                    }}
-                    </style>
-                    """
-                    st.markdown(bubble_style, unsafe_allow_html=True)
-                    st.markdown(f'<div class="speech-bubble"><p class="bubble-text">{status_text}</p></div>', unsafe_allow_html=True)
+            c_bubble_r, c_img_r = st.columns([2.5, 1])
+            
+            with c_bubble_r:
+                guide_style = f"""
+                <style>
+                .guide-bubble {{
+                    position: relative; background: {bubble_bg_color}; border-radius: 12px; padding: 15px 20px;
+                    color: #333; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); margin-right: 10px;
+                    display: flex; align-items: center; min-height: 80px; border: 2px solid rgba(0,0,0,0.05);
+                }}
+                .guide-bubble:after {{
+                    content: ''; position: absolute; right: 0; top: 50%; width: 0; height: 0;
+                    border: 12px solid transparent; border-left-color: {bubble_bg_color}; border-right: 0;
+                    margin-top: -12px; margin-right: -12px;
+                }}
+                .guide-text {{ font-size: 16px; font-weight: 600; line-height: 1.5; margin: 0; font-family: 'Malgun Gothic', sans-serif; }}
+                </style>
+                """
+                st.markdown(guide_style, unsafe_allow_html=True)
+                st.markdown(f'<div class="guide-bubble"><p class="guide-text">{guide_text}</p></div>', unsafe_allow_html=True)
 
+            with c_img_r:
+                if os.path.exists(img_path_guide):
+                    st.image(img_path_guide, use_container_width=True)
+                else:
+                    st.write("🪖")
 
-                # 산점도 시각화
+            # 필터 위치
+            st.write("") 
+            filter_options = ["충동", "게으름", "호흡", "성장"]
+            selected_types = st.multiselect(
+                "분석할 유형 선택하라. (복수 선택도 가능하다.)", 
+                options=filter_options, 
+                default=filter_options
+            )
+
+        # ----------------------------------------------------------------
+        # 하단: 차트 영역
+        # ----------------------------------------------------------------
+        st.markdown("---")
+        col_chart_left, col_chart_right = st.columns(2)
+
+        # -------------------- 하단 좌측: 산점도 --------------------
+        with col_chart_left:
+            st.markdown("##### 📉 낭비 vs 총 지출 상관관계 분석도")
+            
+            if len(monthly_agg) > 1:
                 fig_scatter = px.scatter(
                     monthly_agg, x="waste", y="total", text="month",
-                    labels={"waste": "낭비 (충동+나태)", "total": "총 지출"},
-                    title="낭비 vs 총 지출 상관관계 분석도"
+                    labels={"waste": "낭비 (충동+게으름)", "total": "총 지출"},
                 )
                 try:
                     z = np.polyfit(monthly_agg["waste"], monthly_agg["total"], 1)
@@ -414,90 +474,16 @@ def main():
                 except Exception:
                     pass
                 
+                fig_scatter.update_layout(margin=dict(t=10, l=10, r=10, b=10))
                 st.plotly_chart(fig_scatter, use_container_width=True)
-
             else:
                 st.info("🪖 훈련 데이터 부족! 최소 2개월 이상의 작전 기록이 필요하다.")
 
-        # [우측] 히트맵 분석 (다중 선택)
-        with col_right:
-            st.markdown("##### 🔥 언제 지출이 가장 많은지 보여주겠다.") 
-            
-            # ----------------------------------------------------------------
-            # [우측] 교관의 히트맵 판별법 (상단 이동 + 레이아웃 반전)
-            # ----------------------------------------------------------------
-            script_dir = os.path.dirname(os.path.abspath(__file__)) 
-            root_dir = os.path.dirname(script_dir)                  
-            img_dir = os.path.join(root_dir, 'images')
-            img_path_guide = os.path.join(img_dir, '5-교관의_한마디.png')
-            
-            bubble_bg_color = "#e7f5ff" 
-            
-            guide_text = "💡 <span style='color: #0b7285; font-weight: 600;'>히트맵 판별법</span>: 가로축은 <span style='color: #1c7ed6;'>시간</span>, 세로축은 <span style='color: #1c7ed6;'>요일</span>이다.<br>색이 <span style='color: #e03131;'>붉을수록</span> 해당 시간대에 지출이 극심하다는 뜻이다!"
+        # -------------------- 하단 우측: 히트맵 --------------------
+        with col_chart_right:
+            title_text = f"선택된 유형({', '.join(selected_types)})의 전체 지출 히트맵" if selected_types else "유형을 선택하라"
+            st.markdown(f"##### 🌡️ {title_text}")
 
-            c_bubble, c_img = st.columns([2.5, 1])
-
-            # 1. 좌측 말풍선 (꼬리가 오른쪽으로 가도록 CSS 수정)
-            with c_bubble:
-                guide_style = f"""
-                <style>
-                .guide-bubble {{
-                    position: relative;
-                    background: {bubble_bg_color};
-                    border-radius: 12px;
-                    padding: 15px 20px;
-                    color: #333;
-                    box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-                    margin-right: 10px; 
-                    display: flex;
-                    align-items: center;
-                    min-height: 80px;
-                    border: 2px solid rgba(0,0,0,0.05);
-                }}
-                /* 말풍선 꼬리 오른쪽으로 변경 */
-                .guide-bubble:after {{
-                    content: '';
-                    position: absolute;
-                    right: 0; 
-                    top: 50%;
-                    width: 0;
-                    height: 0;
-                    border: 12px solid transparent;
-                    border-left-color: {bubble_bg_color}; 
-                    border-right: 0;
-                    margin-top: -12px;
-                    margin-right: -12px; 
-                }}
-                .guide-text {{
-                    font-size: 16px; /* 좌측과 통일 (15px -> 16px) */
-                    font-weight: 600; /* 좌측과 통일 (500 -> 600) */
-                    line-height: 1.5;
-                    margin: 0;
-                    font-family: 'Malgun Gothic', sans-serif;
-                }}
-                </style>
-                """
-                st.markdown(guide_style, unsafe_allow_html=True)
-                st.markdown(f'<div class="guide-bubble"><p class="guide-text">{guide_text}</p></div>', unsafe_allow_html=True)
-
-            # 2. 우측 이미지
-            with c_img:
-                if os.path.exists(img_path_guide):
-                    st.image(img_path_guide, use_container_width=True)
-                else:
-                    st.write("🪖")
-
-
-            # ----------------------------------------------------------------
-            # 필터 및 그래프 영역
-            # ----------------------------------------------------------------
-            filter_options = ["충동", "게으름", "호흡", "성장"]
-            selected_types = st.multiselect(
-                "분석할 유형 선택하라. (복수 선택도 가능하다.)", 
-                options=filter_options, 
-                default=filter_options
-            )
-            
             if selected_types:
                 target_df = df[df["재해석"].isin(selected_types)]
             else:
@@ -519,23 +505,23 @@ def main():
                     y=pivot_table.index,
                     aspect="auto",
                     color_continuous_scale="Reds",
-                    title=f"선택된 유형({', '.join(selected_types)})의 전체 지출 기록 합산 히트맵"
                 )
                 fig_heatmap.update_xaxes(range=[-0.5, 23.5], tickmode='linear', dtick=2)
+                
+                fig_heatmap.update_layout(margin=dict(t=10, l=10, r=10, b=10))
                 st.plotly_chart(fig_heatmap, use_container_width=True)
                 
                 st.markdown(f"**🏆 선택 항목 합산 지출 Top 3**")
-                
                 top3 = target_df.nlargest(3, "비용")[["날짜", "대분류", "소분류", "비용", "비고"]]
                 top3["비용"] = top3["비용"].apply(format_currency)
-                
                 top3 = top3.reset_index(drop=True)
                 top3.index = top3.index + 1
-                
                 st.table(top3)
             
             elif selected_types:
                 st.warning(f"선택한 유형에 해당하는 지출 내역이 없다.")
+
+
 
 if __name__ == "__main__":
     main()
