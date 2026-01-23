@@ -23,9 +23,7 @@ sys.path.append(parent_dir)
 try:
     import utils.handle_sql as handle_sql
 except ImportError:
-    # 로컬 테스트 등을 위해 파일이 없을 경우를 대비한 더미 처리 (실제 환경에선 무시됨)
     pass
-
 
 # --------------------------------------------------------------------------------
 # 2. 데이터 로드 및 전처리 (handle_sql 사용)
@@ -43,7 +41,6 @@ def load_and_process_data():
         if 'utils.handle_sql' in sys.modules:
             df = handle_sql.get_data(query)
         else:
-            # handle_sql이 없는 경우(테스트용) 빈 데이터프레임
             return pd.DataFrame()
         
         # 데이터가 없는 경우 빈 DataFrame 반환
@@ -142,15 +139,16 @@ def main():
     df = apply_reinterpretation(raw_df)
 
     # 3. 탭 구성
-    tab1, tab2 = st.tabs(["📊 월별 리포트 (재해석)", "🔥 지출 패턴 분석"]) # [수정] 용어 통일
+    tab1, tab2 = st.tabs(["📊 월별 리포트 (재해석)", "🔥 지출 패턴 분석"]) 
 
     # --- TAB 1: 월별 리포트 ---
     with tab1:
-        st.subheader("📅 월별 지출 성격 분석이다.") # [수정] 용어 통일
+        st.subheader("📅 월별 지출 성격 분석이다.") 
         
         all_months = sorted(df['month'].unique(), reverse=True)
         selected_month = st.selectbox("분석할 월을 선택하라.", all_months)
         
+        # [중요] 선택된 월 데이터만 필터링 (month_df)
         month_df = df[df['month'] == selected_month].copy()
         
         # 통계 집계
@@ -225,41 +223,92 @@ def main():
                 growth_text
             ), unsafe_allow_html=True)
 
-        # 차트 및 데이터 테이블
-        c_chart, c_table = st.columns([1, 1.5])
+        # -----------------------------------------------------------
+        # [수정] 차트 영역 (좌: 재해석 파이차트, 우: 카테고리 바차트)
+        # -----------------------------------------------------------
+        st.markdown("---")
+        col_pie, col_bar = st.columns(2)
         
-        with c_chart:
+        # [좌측] 지출 성격 비중 (파이차트)
+        with col_pie:
+            st.subheader(f"🎨 {selected_month} 지출 성격 비중")
+            
             colors = {"충동":"#FF6B6B", "게으름":"#FFA07A", "호흡":"#4D96FF", "성장":"#6BCB77", "중립":"#E0E0E0"}
+            
             if not cost_by_type.empty:
-                fig = px.pie(
+                fig_pie = px.pie(
                     names=cost_by_type.index, 
                     values=cost_by_type.values,
-                    title=f"{selected_month} 지출 비중", # [수정] 용어 통일
                     hole=0.4,
                     color=cost_by_type.index,
                     color_discrete_map=colors
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                # [핵심] 높이 고정 (400px)
+                fig_pie.update_layout(height=400, margin=dict(t=20, b=20))
+                st.plotly_chart(fig_pie, use_container_width=True)
+            else:
+                st.info("데이터가 없습니다.")
 
-        with c_table:
-            st.markdown(f"**📝 {selected_month} 상세 내역**")
-            display_cols = ["날짜", "대분류", "소분류", "비용", "재해석", "비고"]
-            st.dataframe(
-                month_df[display_cols].sort_values("날짜", ascending=False), 
-                use_container_width=True,
-                height=400,
-                hide_index=True
-            )
+        # [우측] 카테고리 비중 (바차트)
+        with col_bar:
+            st.subheader(f"💸 {selected_month} 지출 상위 Top 5")
+            
+            if not month_df.empty:
+                category_ratio = (
+                    month_df.groupby("대분류")["비용"]
+                    .sum()
+                    .sort_values(ascending=False)
+                    .head(5)
+                )
+                
+                # [핵심] st.bar_chart -> px.bar 로 변경 (제어를 위해)
+                fig_bar = px.bar(
+                    x=category_ratio.index, 
+                    y=category_ratio.values,
+                    text_auto=True,  # 막대 위에 값 표시
+                    labels={'x': '카테고리', 'y': '비용'}
+                )
+                
+                # [핵심] 높이 고정 (400px) & 마우스 오버 툴팁 포맷 설정
+                fig_bar.update_layout(
+                    height=400, 
+                    margin=dict(t=20, b=20),
+                    yaxis_tickformat=',' # Y축 천단위 콤마
+                )
+                
+                # [핵심] X축 라벨 회전 방지 (0도)
+                fig_bar.update_xaxes(tickangle=0)
+                
+                # 막대 색상 커스텀 (파란색 계열)
+                fig_bar.update_traces(marker_color='#0068c9', texttemplate='%{y:,}', textposition='outside')
+                
+                st.plotly_chart(fig_bar, use_container_width=True)
+            else:
+                st.info("데이터가 없습니다.")
 
-    # --- TAB 2: 패턴 분석 ---
+        # -----------------------------------------------------------
+        # [수정] 상세 내역 테이블 (하단에 넓게 배치)
+        # -----------------------------------------------------------
+        st.markdown("---")
+        st.markdown(f"**📝 {selected_month} 상세 내역**")
+        display_cols = ["날짜", "대분류", "소분류", "비용", "재해석", "비고"]
+        
+        st.dataframe(
+            month_df[display_cols].sort_values("날짜", ascending=False), 
+            use_container_width=True, # 화면 전체 너비 사용
+            height=400,
+            hide_index=True
+        )
+
+# --- TAB 2: 패턴 분석 ---
     with tab2:
-        st.subheader("🔍 지출 행동 패턴 분석이다!") # [수정] 용어 통일
+        st.subheader("🔍 지출 행동 패턴 분석이다!") 
         
         col_left, col_right = st.columns(2)
 
-# [좌측] 상관관계 분석
+        # [좌측] 상관관계 분석
         with col_left:
-            st.markdown("##### 📉 너의 낭비가 총 지출에 미치는 영향을 보여주겠다.")
+            st.markdown("##### 📉 너의 낭비가 총 지출에 미치는 영향이다.")
             
             # 1. 데이터 집계
             monthly_agg = df.groupby("month").apply(
@@ -273,62 +322,32 @@ def main():
                 # 2. 상관계수 계산
                 corr_value = monthly_agg['waste'].corr(monthly_agg['total'])
                 
-                # 3. 산점도 시각화
-                fig_scatter = px.scatter(
-                    monthly_agg, x="waste", y="total", text="month",
-                    labels={"waste": "낭비 (충동+나태)", "total": "총 지출"},
-                    title="낭비 vs 총 지출 상관관계"
-                )
-                try:
-                    z = np.polyfit(monthly_agg["waste"], monthly_agg["total"], 1)
-                    p = np.poly1d(z)
-                    x_range = np.linspace(monthly_agg["waste"].min(), monthly_agg["waste"].max(), 100)
-                    fig_scatter.add_trace(go.Scatter(x=x_range, y=p(x_range), mode='lines', name='추세선', line=dict(dash='dot', color='red')))
-                except Exception:
-                    pass
-                
-                st.plotly_chart(fig_scatter, use_container_width=True)
-                
-                # ----------------------------------------------------------------
-                # [수정] 교관의 정밀 타격 (한마디) 섹션
-                # ----------------------------------------------------------------
-                st.markdown("---")
-                st.markdown("#### 📢 교관이 정밀 타격을 실시하겠다.")
 
-                # 경로 설정 (pages 폴더 밖으로 나가서 images 폴더 찾기)
                 script_dir = os.path.dirname(os.path.abspath(__file__)) 
                 root_dir = os.path.dirname(script_dir)                  
                 img_dir = os.path.join(root_dir, 'images')              
 
-                # 4. 상관계수에 따른 이미지 및 멘트 선정
-                # [수정] Bold 제거, 색상만 적용
                 val_html = f"<span style='color: #d63384; font-size: 1.1em;'>{corr_value:.2f}</span>"
 
                 if corr_value >= 0.7:
                     img_path = os.path.join(img_dir, '4-화남.png')
                     bg_color = "#ffeaea" 
-                    # 강조: 빨간색 (#e03131)
                     status_text = f"낭비가 총 지출을 <span style='color: #e03131;'>직접적으로 폭발시키는</span> 상관계수 {val_html}이다!<br>정신이 있는 건가?! 당장 충동을 억제하고 실시! 😡"
                 elif corr_value >= 0.3:
                     img_path = os.path.join(img_dir, '3-짜증.png')
                     bg_color = "#fff3cd"
-                    # 강조: 주황색 (#e8590c)
                     status_text = f"낭비가 늘면 지출도 <span style='color: #e8590c;'>따라서 증가하는</span> 상관계수 {val_html}다!<br>경고한다! 전력 누수가 심각하다. 정신 차려라! 😠"
                 elif corr_value > -0.3:
                     img_path = os.path.join(img_dir, '1-온화.png')
                     bg_color = "#d4edda"
-                    # 강조: 초록색 (#2b8a3e)
                     status_text = f"낭비와 지출이 <span style='color: #2b8a3e;'>서로 영향이 없는</span> 상관계수 {val_html}.<br>보고! 특이사항 없음. 생명 유지비(고정비)를 점검하라. 🤔"
                 else:
                     img_path = os.path.join(img_dir, '2-걱정.png')
                     bg_color = "#e2e3e5"
-                    # 강조: 보라색 (#5f3dc4)
                     status_text = f"낭비를 줄였는데 지출이 늘어나는 <span style='color: #5f3dc4;'>역방향</span> 상관계수 {val_html} 감지!<br>비상! 기현상이다. 정밀 타격이 필요하다! 😨"
 
-                # 5. 레이아웃 구성
                 col_img, col_bubble = st.columns([1, 2.5])
 
-                # [좌측] 교관 이미지
                 with col_img:
                     if os.path.exists(img_path):
                         st.image(img_path, use_container_width=True)
@@ -336,7 +355,6 @@ def main():
                         st.error(f"이미지 경로 확인 필요: {img_path}")
                         st.write("🪖") 
 
-                # [우측] 말풍선 메시지
                 with col_bubble:
                     bubble_style = f"""
                     <style>
@@ -367,8 +385,8 @@ def main():
                         margin-left: -12px;
                     }}
                     .bubble-text {{
-                        font-size: 16px;
-                        font-weight: bold; /* 전체 텍스트 기본 굵기 */
+                        font-size: 16px; /* 우측과 통일 */
+                        font-weight: 600; /* 우측과 통일 (Bold 대신 600) */
                         line-height: 1.5;
                         margin: 0;
                         font-family: 'Malgun Gothic', sans-serif;
@@ -376,19 +394,100 @@ def main():
                     </style>
                     """
                     st.markdown(bubble_style, unsafe_allow_html=True)
-                    # HTML이 적용된 status_text를 출력
                     st.markdown(f'<div class="speech-bubble"><p class="bubble-text">{status_text}</p></div>', unsafe_allow_html=True)
+
+
+                # 산점도 시각화
+                fig_scatter = px.scatter(
+                    monthly_agg, x="waste", y="total", text="month",
+                    labels={"waste": "낭비 (충동+나태)", "total": "총 지출"},
+                    title="낭비 vs 총 지출 상관관계 분석도"
+                )
+                try:
+                    z = np.polyfit(monthly_agg["waste"], monthly_agg["total"], 1)
+                    p = np.poly1d(z)
+                    x_range = np.linspace(monthly_agg["waste"].min(), monthly_agg["waste"].max(), 100)
+                    fig_scatter.add_trace(go.Scatter(x=x_range, y=p(x_range), mode='lines', name='추세선', line=dict(dash='dot', color='red')))
+                except Exception:
+                    pass
+                
+                st.plotly_chart(fig_scatter, use_container_width=True)
 
             else:
                 st.info("🪖 훈련 데이터 부족! 최소 2개월 이상의 작전 기록이 필요하다.")
 
-
-
-
         # [우측] 히트맵 분석 (다중 선택)
         with col_right:
-            st.markdown("##### 🔥 언제 지출이 가장 많은지 보여주겠다.") # [수정] 문구 자연스럽게 변경
+            st.markdown("##### 🔥 언제 지출이 가장 많은지 보여주겠다.") 
             
+            # ----------------------------------------------------------------
+            # [우측] 교관의 히트맵 판별법 (상단 이동 + 레이아웃 반전)
+            # ----------------------------------------------------------------
+            script_dir = os.path.dirname(os.path.abspath(__file__)) 
+            root_dir = os.path.dirname(script_dir)                  
+            img_dir = os.path.join(root_dir, 'images')
+            img_path_guide = os.path.join(img_dir, '5-교관의_한마디.png')
+            
+            bubble_bg_color = "#e7f5ff" 
+            
+            guide_text = "💡 <span style='color: #0b7285; font-weight: 600;'>히트맵 판별법</span>: 가로축은 <span style='color: #1c7ed6;'>시간</span>, 세로축은 <span style='color: #1c7ed6;'>요일</span>이다.<br>색이 <span style='color: #e03131;'>붉을수록</span> 해당 시간대에 지출이 극심하다는 뜻이다!"
+
+            c_bubble, c_img = st.columns([2.5, 1])
+
+            # 1. 좌측 말풍선 (꼬리가 오른쪽으로 가도록 CSS 수정)
+            with c_bubble:
+                guide_style = f"""
+                <style>
+                .guide-bubble {{
+                    position: relative;
+                    background: {bubble_bg_color};
+                    border-radius: 12px;
+                    padding: 15px 20px;
+                    color: #333;
+                    box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+                    margin-right: 10px; 
+                    display: flex;
+                    align-items: center;
+                    min-height: 80px;
+                    border: 2px solid rgba(0,0,0,0.05);
+                }}
+                /* 말풍선 꼬리 오른쪽으로 변경 */
+                .guide-bubble:after {{
+                    content: '';
+                    position: absolute;
+                    right: 0; 
+                    top: 50%;
+                    width: 0;
+                    height: 0;
+                    border: 12px solid transparent;
+                    border-left-color: {bubble_bg_color}; 
+                    border-right: 0;
+                    margin-top: -12px;
+                    margin-right: -12px; 
+                }}
+                .guide-text {{
+                    font-size: 16px; /* 좌측과 통일 (15px -> 16px) */
+                    font-weight: 600; /* 좌측과 통일 (500 -> 600) */
+                    line-height: 1.5;
+                    margin: 0;
+                    font-family: 'Malgun Gothic', sans-serif;
+                }}
+                </style>
+                """
+                st.markdown(guide_style, unsafe_allow_html=True)
+                st.markdown(f'<div class="guide-bubble"><p class="guide-text">{guide_text}</p></div>', unsafe_allow_html=True)
+
+            # 2. 우측 이미지
+            with c_img:
+                if os.path.exists(img_path_guide):
+                    st.image(img_path_guide, use_container_width=True)
+                else:
+                    st.write("🪖")
+
+
+            # ----------------------------------------------------------------
+            # 필터 및 그래프 영역
+            # ----------------------------------------------------------------
             filter_options = ["충동", "게으름", "호흡", "성장"]
             selected_types = st.multiselect(
                 "분석할 유형 선택하라. (복수 선택도 가능하다.)", 
@@ -417,18 +516,16 @@ def main():
                     y=pivot_table.index,
                     aspect="auto",
                     color_continuous_scale="Reds",
-                    title=f"선택된 유형({', '.join(selected_types)}) 합산 히트맵"
+                    title=f"선택된 유형({', '.join(selected_types)})의 전체 지출 기록 합산 히트맵"
                 )
                 fig_heatmap.update_xaxes(range=[-0.5, 23.5], tickmode='linear', dtick=2)
                 st.plotly_chart(fig_heatmap, use_container_width=True)
                 
-                # [수정] 순위 Table (인덱스 1부터 시작)
                 st.markdown(f"**🏆 선택 항목 합산 지출 Top 3**")
                 
                 top3 = target_df.nlargest(3, "비용")[["날짜", "대분류", "소분류", "비용", "비고"]]
                 top3["비용"] = top3["비용"].apply(format_currency)
                 
-                # 인덱스 리셋 후 1부터 시작하도록 조정
                 top3 = top3.reset_index(drop=True)
                 top3.index = top3.index + 1
                 
