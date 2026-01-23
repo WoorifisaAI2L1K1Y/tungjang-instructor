@@ -2,8 +2,12 @@ import streamlit as st
 import pandas as pd
 import os
 import sys
+import json
 from dotenv import load_dotenv
 from openai import OpenAI
+import folium
+from streamlit_folium import st_folium
+from datetime import datetime
 
 # =========================
 # 기본 설정
@@ -17,7 +21,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# utils 폴더 경로 설정
+# utils 경로
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.join(current_dir, "..")
 sys.path.append(parent_dir)
@@ -31,33 +35,39 @@ st.title("🪖 미래 소비 훈련소")
 st.caption("지금의 선택이 미래를 만든다. 숫자는 거짓말을 하지 않는다.")
 
 # =========================
+# 예산 로드
+# =========================
+BUDGET_FILE = "data/budget_settings.json"
+DEFAULT_BUDGET = 1_000_000
+
+def load_budget():
+    if os.path.exists(BUDGET_FILE):
+        try:
+            with open(BUDGET_FILE, "r") as f:
+                data = json.load(f)
+                return data.get("budget", DEFAULT_BUDGET)
+        except:
+            return DEFAULT_BUDGET
+    return DEFAULT_BUDGET
+
+monthly_budget = load_budget()
+
+# =========================
 # 데이터 로드
 # =========================
 @st.cache_data(ttl=600)
 def load_expense_data():
-    try:
-        query = """
-        SELECT date, time, category, reason, cost
-        FROM card
-        """
-        df = handle_sql.get_data(query)
-
-        if df.empty:
-            return pd.DataFrame()
-
-        df["date"] = pd.to_datetime(df["date"])
-        df["cost"] = pd.to_numeric(df["cost"], errors="coerce").fillna(0)
-        df["month"] = df["date"].dt.to_period("M").astype(str)
-        df["weekday"] = df["date"].dt.day_name()
-
-        return df
-    except Exception as e:
-        st.error(f"데이터 로드 중 오류가 발생했습니다: {e}")
-        return pd.DataFrame()
-
+    query = """
+    SELECT date, time, category, reason, cost
+    FROM card
+    """
+    df = handle_sql.get_data(query)
+    df["date"] = pd.to_datetime(df["date"])
+    df["cost"] = pd.to_numeric(df["cost"], errors="coerce").fillna(0)
+    df["month"] = df["date"].dt.to_period("M").astype(str)
+    return df
 
 df = load_expense_data()
-
 if df.empty:
     st.warning("소비 데이터가 없어 훈련이 불가하다.")
     st.stop()
@@ -67,13 +77,7 @@ if df.empty:
 # =========================
 monthly = df.groupby("month")["cost"].sum().reset_index()
 recent_3 = monthly.tail(3)
-
-if len(recent_3) > 0:
-    avg_monthly = recent_3["cost"].mean()
-    last_month = recent_3.iloc[-1]["cost"]
-    trend = last_month - avg_monthly
-else:
-    avg_monthly = last_month = trend = 0
+avg_monthly = recent_3["cost"].mean()
 
 category_ratio = (
     df.groupby("category")["cost"]
@@ -82,210 +86,233 @@ category_ratio = (
     .head(5)
 )
 
+current_month = datetime.now().strftime("%Y-%m")
+used_this_month = df[df["month"] == current_month]["cost"].sum()
+
+# =========================
+# 공통 계산(남은 일수 / 하루 사용 가능 금액)
+# =========================
+today = datetime.now()
+days_in_month = pd.Period(today.strftime("%Y-%m")).days_in_month
+remaining_days = days_in_month - today.day
+remaining_budget = monthly_budget - used_this_month
+daily_available = remaining_budget / remaining_days if remaining_days > 0 else 0
+
+# =========================
+# 재해석 매핑 (TAB1에서 낭비 계산용)
+# =========================
+def apply_reinterpretation(df):
+    mapping_rules = {
+        ("식비", "배달/야식"): "게으름",
+        ("식비", "카페/간식"): "충동",
+        ("식비", "술/유흥"): "충동",
+        ("주거/통신", "월세/관리비"): "호흡",
+        ("주거/통신", "공과금"): "호흡",
+        ("주거/통신", "통신비"): "호흡",
+        ("주거/통신", "구독/OTT"): "호흡",
+        ("생활/쇼핑", "패션/미용"): "충동",
+        ("생활/쇼핑", "가전/가구"): "충동",
+        ("생활/쇼핑", "반려동물"): "호흡",
+        ("교통/차량", "대중교통"): "호흡",
+        ("교통/차량", "자차/주유"): "호흡",
+        ("교통/차량", "택시/호출"): "게으름",
+        ("건강/운동", "운동/헬스"): "성장",
+        ("교육/계발", "도서/문구"): "성장",
+        ("교육/계발", "강의/수강"): "성장",
+        ("관계", "데이트/모임"): "충동",
+        ("문화/취미", "영화/공연"): "충동",
+        ("문화/취미", "여행"): "충동",
+        ("금융", "보험/세금"): "호흡",
+        ("금융", "저축/투자"): "성장"
+    }
+    
+    df = df.copy()
+    df['sub_category'] = df['reason']  # reason을 소분류로 사용
+    def get_category(row):
+        return mapping_rules.get((row['category'], row['sub_category']), "중립")
+    df['재해석'] = df.apply(get_category, axis=1)
+    return df
+
+df_reinterpreted = apply_reinterpretation(df)
+
+# =========================
+# 프롬프트 생성
+# =========================
+def generate_final_prompt(
+    budget,
+    used_amount,
+    remaining_days,
+    daily_limit,
+    waste_amount
+):
+    return f"""
+너는 소비 훈련소 교관이다. 이 훈련의 최종 결론을 내야 한다.
+아래 사용자 지출 정보를 보고 최종 교관의 한마디를 출력해라.
+현재 남은 일수 대비 하루에 사용할 수 있는 금액을 포함하고, 
+낭비 비용에 따라 사용자가 어떻게 해야하는지 한 문장으로 분석해라.
+
+사용자는 월 예산: {budget:,.0f}원
+현재까지 사용한 금액: {used_amount:,.0f}원
+남은 일 수: {remaining_days}일
+남은 일 동안 쓸 수 있는 금액: {daily_limit:,.0f}원
+낭비(충동+게으름)비용: {waste_amount:,.0f}원
+
+출력은 반드시 교관 말투인 명령어로 해야하며, 군대에서 처럼 다,나,까 말투로 출력해라.
+개조식이 아닌 자연스러운 말투로 5문장 이내로 출력해라.
+"""
+
 # =========================
 # 탭 구성
 # =========================
 tab1, tab2, tab3 = st.tabs(
-    ["🔮 미래 시나리오", "📉 위험 예측", "🪖 교관의 평가"]
+    ["🪖 교관의 평가", "📆 일일 생존비", "🔮 희망회로"]
 )
 
 # =========================
-# TAB 1: 미래 시나리오
+# TAB 1: 교관의 평가
 # =========================
 with tab1:
-    st.subheader("🔮 미래 소비 시나리오 선택")
-
-    col1, col2 = st.columns([1, 2])
-
-    with col1:
-        future_months = st.slider(
-            "몇 개월 뒤를 볼 것인가?",
-            min_value=1,
-            max_value=12,
-            value=6
-        )
-
-        scenario = st.radio(
-            "소비 시나리오",
-            ["😐 유지", "😇 절약 (-20%)", "😈 폭증 (+15%)"]
-        )
-
-    multiplier = {
-        "😐 유지": 1.0,
-        "😇 절약 (-20%)": 0.8,
-        "😈 폭증 (+15%)": 1.15
-    }[scenario]
-
-    predicted_monthly = avg_monthly * multiplier
-    predicted_total = predicted_monthly * future_months
-
-    with col2:
-        st.metric("예상 월 지출", f"{predicted_monthly:,.0f}원")
-        st.metric(
-            f"{future_months}개월 총 지출",
-            f"{predicted_total:,.0f}원"
-        )
-
-    # 누적 지출 시각화
-    sim_df = pd.DataFrame({
-        "month": range(1, future_months + 1),
-        "누적 지출": [predicted_monthly * i for i in range(1, future_months + 1)]
-    })
-
-    st.line_chart(sim_df.set_index("month"))
-
-# =========================
-# TAB 2: 위험 예측
-# =========================
-with tab2:
-    st.subheader("📉 미래 위험 예측")
-
-    danger_line = avg_monthly * 1.1
-
-    if predicted_monthly > danger_line:
-        st.error("🚨 위험 상태: 현재 패턴은 통제 불능이다.")
-        level = "HIGH RISK"
-    elif predicted_monthly > avg_monthly:
-        st.warning("⚠️ 주의 상태: 소비가 증가 추세다.")
-        level = "WARNING"
-    else:
-        st.success("✅ 안정 상태: 통제 가능한 소비다.")
-        level = "STABLE"
-
-    st.metric("위험 등급", level)
-
-    # 카테고리 비중 시각화
-    st.subheader("💸 지출 상위 카테고리")
-    st.bar_chart(category_ratio)
-
-# =========================
-# GPT 프롬프트
-# =========================
-def generate_prompt(avg_monthly, future_months, predicted_total, category_ratio, scenario):
-    top_categories = "\n".join(
-        [f"- {cat}: {cost:,.0f}원" for cat, cost in category_ratio.items()]
-    )
-
-    return f"""
-너는 소비 훈련소 교관이다.
-모호한 표현은 절대 사용하지 마라.
-
-[시나리오]
-{scenario}
-
-[객관적 수치]
-- 평균 월 지출: {avg_monthly:,.0f}원
-- {future_months}개월 예상 총 지출: {predicted_total:,.0f}원
-- 지출 상위 카테고리:
-{top_categories}
-
-아래 형식으로만 답해라.
-
-[판단]
-
-[미래 경고]
-
-[즉시 명령]
-
-모든 문장은 단정적으로 작성하라.
-"""
-
-# =========================
-# TAB 3: 교관의 평가
-# =========================
-with tab3:
     st.subheader("🪖 교관의 최종 평가")
 
-    instructor_img_path = r"./images/5-교관의_한마디.png"
+    instructor_img_path = "./images/5-교관의_한마디.png"
 
-    # 말풍선 CSS (다른 파일에서 사용한 스타일 차용)
-    st.markdown(
-    """
+    st.markdown("""
     <style>
     .speech-bubble {
-        position: relative;
-        background: #FFF3CD; /* 노란 말풍선 */
+        background: #FFF3CD;
         border-radius: 12px;
         padding: 16px;
-        color: #333;
-        box-shadow: 1px 1px 4px rgba(0,0,0,0.15);
-        margin-left: 8px;
-        min-height: 100px;
-        display: flex;
-        align-items: center;
-        font-size: 16px;
-        line-height: 1.6;
         font-weight: 600;
-    }
-    .speech-bubble:after {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 40px;
-        width: 0;
-        height: 0;
-        border: 12px solid transparent;
-        border-right-color: #FFF3CD; /* 꼬리도 같은 노랑 */
-        border-left: 0;
-        margin-top: -12px;
-        margin-left: -12px;
+        box-shadow: 1px 1px 4px rgba(0,0,0,0.15);
     }
     </style>
-    """,
-    unsafe_allow_html=True
-)
+    """, unsafe_allow_html=True)
 
-
-    # 상태 저장 (버튼 전/후 말풍선 유지용)
     if "coach_feedback" not in st.session_state:
-        st.session_state.coach_feedback = "훈련병, 아직 판단할 정보가 부족하다.<br>아래 버튼을 눌러 미래를 확인해라."
+        st.session_state.coach_feedback = "훈련병, 버튼을 눌러 평가를 받아라."
 
-    # 레이아웃: 이미지 | 말풍선
-    col_img, col_bubble = st.columns([1.2, 3.8])
-
-    with col_img:
+    col1, col2 = st.columns([1, 4])
+    with col1:
         st.image(instructor_img_path, use_container_width=True)
-
-    with col_bubble:
+    with col2:
         st.markdown(
-            f"""
-            <div class="speech-bubble">
-            {st.session_state.coach_feedback}
-            </div>
-            """,
+            f"<div class='speech-bubble'>{st.session_state.coach_feedback}</div>",
             unsafe_allow_html=True
         )
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    # 낭비(충동+게으름) 계산
+    month_df = df_reinterpreted[df_reinterpreted["month"] == current_month]
+    waste_amount = month_df[month_df["재해석"].isin(["충동", "게으름"])]["cost"].sum()
 
-    # 버튼
     if st.button("🧠 미래 평가 받기"):
         with st.spinner("교관이 판단 중이다..."):
-            try:
-                prompt = generate_prompt(
-                    avg_monthly,
-                    future_months,
-                    predicted_total,
-                    category_ratio,
-                    scenario
-                )
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "너는 소비 훈련소 교관이다."},
+                    {"role": "user", "content": generate_final_prompt(
+                        monthly_budget,
+                        used_this_month,
+                        remaining_days,
+                        daily_available,
+                        waste_amount
+                    )}
+                ],
+                temperature=0.4
+            )
+            st.session_state.coach_feedback = response.choices[0].message.content.replace("\n", "<br>")
+            st.rerun()
 
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": "너는 소비 훈련소 교관이다."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.6
-                )
+# =========================
+# TAB 2: 일일 생존비
+# =========================
+with tab2:
+    st.subheader("📆 일일 생존비")
 
-                # 응답을 세션에 저장 → 말풍선 내용 교체
-                st.session_state.coach_feedback = response.choices[0].message.content.replace(
-                    "\n", "<br>"
-                )
+    col1, col2 = st.columns(2)
 
-                st.rerun()
+    with col1:
+        st.metric("나의 월 예산", f"{monthly_budget:,.0f}원")
 
-            except Exception as e:
-                st.error(f"AI 호출 중 오류 발생: {e}")
-    st.warning("말뿐인 다짐은 의미 없다. 숫자로 증명해라.")
+    with col2:
+        st.metric("현재까지 사용한 금액", f"{used_this_month:,.0f}원")
+
+    if remaining_budget < 0:
+        st.error(f"예산 초과: {remaining_budget:,.0f}원")
+    else:
+        st.success(f"사용 가능한 남은 금액: {remaining_budget:,.0f}원")
+
+    st.markdown("---")
+
+    c1, c2 = st.columns(2)
+    c1.metric("📅 남은 일수", f"{remaining_days}일")
+    c2.metric("📌 하루 사용 가능 금액", f"{daily_available:,.0f}원")
+
+# =========================
+# TAB 3: 희망회로
+# =========================
+with tab3:
+    st.subheader("🔮 희망회로")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("나의 월 예산", f"{monthly_budget:,.0f}원")
+    with col2:
+        st.metric("예상 월 지출", f"{avg_monthly:,.0f}원")
+
+    months = st.slider("몇 개월간 버틸 것인가?", 1, 12, 6)
+    savings = (monthly_budget - avg_monthly) * months
+
+    st.metric("예상 모은 금액", f"{savings:,.0f}원")
+
+    destination = ""
+    center_lat, center_lon, zoom = 37.5, 127, 3
+
+    if savings < 0:
+        destination = "논산 훈련소"
+        center_lat, center_lon, zoom = 36.187, 127.098, 11
+    elif savings < 500_000:
+        destination = "국내 여행"
+        center_lat, center_lon, zoom = 36.5, 127.8, 6
+    elif savings < 1_000_000:
+        destination = "일본"
+        center_lat, center_lon, zoom = 35.6762, 139.6503, 5
+    elif savings < 2_000_000:
+        destination = "두바이"
+        center_lat, center_lon, zoom = 25.2048, 55.2708, 5
+    elif savings < 3_000_000:
+        destination = "파리"
+        center_lat, center_lon, zoom = 48.8566, 2.3522, 5
+    else:
+        destination = "아이슬란드"
+        center_lat, center_lon, zoom = 64.9631, -19.0208, 4
+
+    fmap = folium.Map(
+        location=[center_lat, center_lon],
+        zoom_start=zoom,
+        tiles="CartoDB positron"
+    )
+
+    def mark(lat, lon, ko, en):
+        folium.Marker(
+            [lat, lon],
+            tooltip=f"{ko} / {en}",
+            popup=f"<b>{ko}</b><br>{en}",
+            icon=folium.Icon(icon="plane", prefix="fa", color="blue")
+        ).add_to(fmap)
+
+    if destination == "논산 훈련소":
+        mark(36.187, 127.098, "논산 훈련소", "Nonsan Training Center")
+    elif destination == "국내 여행":
+        mark(37.5665, 126.9780, "국내 여행", "Domestic Trip")
+    elif destination == "일본":
+        mark(35.6762, 139.6503, "일본 여행", "Japan")
+    elif destination == "두바이":
+        mark(25.2048, 55.2708, "두바이", "Dubai")
+    elif destination == "파리":
+        mark(48.8566, 2.3522, "파리", "Paris")
+    else:
+        mark(64.9631, -19.0208, "아이슬란드", "Iceland")
+
+    st.success(f"🧭 이번 희망회로 결과: **{destination} 가능**")
+    st_folium(fmap, height=450, width=800)
