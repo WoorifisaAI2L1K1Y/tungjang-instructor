@@ -15,7 +15,7 @@ except ImportError:
     st.error("handle_sql.py 파일을 찾을 수 없습니다.")
 
 # --- [1. 기본 설정 및 배경색 지정] ---
-st.set_page_config(page_title="텅장 훈련소", page_icon="💸🪖",layout="wide")
+st.set_page_config(page_title="텅장 훈련소", page_icon="💸🪖", layout="wide")
 
 # 페이지 전체 배경색 설정
 page_bg_color = "#fcfcfb"
@@ -23,6 +23,26 @@ st.markdown(f"""
     <style>
     .stApp {{
         background-color: {page_bg_color};
+    }}
+    .metric-card {{
+        background-color: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
+        border: 1px solid #e0e0e0;
+        margin-bottom: 10px;
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }}
+    .section-header {{
+        font-size: 24px;
+        font-weight: 700;
+        color: #1f1f1f;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e0e0e0;
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -49,6 +69,18 @@ def save_budget():
         json.dump({'budget': new_value}, f)
 
 def main():
+    # 헤더 영역
+    st.markdown("""
+    <div style="text-align: center; padding: 20px 0; margin-bottom: 30px;">
+        <h1 style="color: #1f1f1f; font-size: 36px; font-weight: 700; margin: 0;">
+            💸 텅장 훈련소 💸
+        </h1>
+        <p style="color: #666; font-size: 16px; margin-top: 10px;">
+            소비 습관 개선을 위한 훈련 프로그램
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
     # --- [사이드바] 예산 입력 ---
     with st.sidebar:
         st.header("💰 예산 설정")
@@ -62,6 +94,14 @@ def main():
             key='budget_input',
             on_change=save_budget
         )
+        st.markdown("---")
+        st.markdown("""
+        <div style="padding: 15px; background-color: #f8f9fa; border-radius: 8px; font-size: 13px; color: #666;">
+            <strong>💡 팁</strong><br>
+            현실적인 예산을 설정하면<br>
+            더 정확한 분석이 가능합니다.
+        </div>
+        """, unsafe_allow_html=True)
 
     # --- [2. 로고 영역] ---
     logo_l, logo_m, logo_r = st.columns([2, 2, 2])
@@ -121,7 +161,7 @@ def main():
     elif 0 < monthly_budget < 10000:
         img_path = './images/6-어이없음.png'
         bg_color = "#FFE0B2"
-        status_text = f"자네 지금 장난하나? {monthly_budget}원으론 <br>돈까스도 못 사 먹네.<br><b>최소 10,000원 이상</b>으로 현실적인 예산을 설정하게!"
+        status_text = f"자네 지금 장난하나? {monthly_budget:,.0f}원으론 <br>돈까스도 못 사 먹네.<br><b>최소 10,000원 이상</b>으로 현실적인 예산을 설정하게!"
 
     # [조건 B] 예산이 정상적으로 설정되었을 때 (10,000원 이상) -> 예산 소진율 기준 평가
     else:
@@ -142,24 +182,18 @@ def main():
 
     # --- [5. 메인 레이아웃 구성] ---
     
-    # 박스 스타일 함수
-    def info_box(label, value, color="black", bg_color="white", height="auto"):
+    # 박스 스타일 함수 (카드 스타일로 개선)
+    def create_info_card(label, value, color="#1f1f1f", bg_color="white"):
         return f"""
-        <div style="
-            background-color: {bg_color}; 
-            padding: 10px; 
-            border-radius: 8px; 
-            text-align: center; 
-            box-shadow: 0px 1px 2px rgba(0,0,0,0.1);
-            border: 1px solid #eee;
-            margin-bottom: 8px;
-            height: {height};
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            "> 
-            <p style="font-size: 12px; color: #888; margin: 0;">{label}</p>
-            <p style="font-size: 16px; font-weight: bold; color: {color}; margin: 2px 0 0 0;">{value}</p>
+        <div class="metric-card" style="background-color: {bg_color};">
+            <div>
+                <div style="font-size: 13px; color: #666; margin-bottom: 8px; font-weight: 500;">
+                    {label}
+                </div>
+                <div style="font-size: 24px; font-weight: 700; color: {color};">
+                    {value}
+                </div>
+            </div>
         </div>
         """
 
@@ -168,7 +202,7 @@ def main():
 
     # [좌측] 교관 이미지 + 말풍선
     with top_left:
-        st.markdown("#### 📢 교관의 한마디")
+        st.markdown('<div class="section-header">📢 교관의 한마디</div>', unsafe_allow_html=True)
         sub_img, sub_bubble = st.columns([1.8, 2.5])
         
         with sub_img:
@@ -184,13 +218,14 @@ def main():
                 position: relative;
                 background: {bg_color};
                 border-radius: 12px;
-                padding: 15px;
+                padding: 18px 22px;
                 color: #333;
-                box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
-                margin-left: 5px;
+                box-shadow: 2px 2px 8px rgba(0,0,0,0.15);
+                margin-left: 10px;
                 display: flex;
                 align-items: center;
-                min-height: 80px;
+                min-height: 90px;
+                border: 2px solid rgba(0,0,0,0.08);
             }}
             .speech-bubble:after {{
                 content: '';
@@ -199,29 +234,36 @@ def main():
                 top: 50%;
                 width: 0;
                 height: 0;
-                border: 12px solid transparent;
+                border: 14px solid transparent;
                 border-right-color: {bg_color};
                 border-left: 0;
-                margin-top: -12px;
-                margin-left: -12px;
+                margin-top: -14px;
+                margin-left: -14px;
+            }}
+            .bubble-text {{
+                font-size: 15px;
+                font-weight: 600;
+                line-height: 1.6;
+                margin: 0;
+                font-family: 'Malgun Gothic', sans-serif;
             }}
             </style>
             """
             st.markdown(bubble_style, unsafe_allow_html=True)
-            st.markdown(f'<div class="speech-bubble"><b>{status_text}</b></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="speech-bubble"><p class="bubble-text">{status_text}</p></div>', unsafe_allow_html=True)
 
     # [우측] 기본 정보 3개 (세로 스택 - 항상 표시)
     with top_right:
-        st.markdown("<div style='height: 38px;'></div>", unsafe_allow_html=True) # 높이 맞춤용
-        st.markdown(info_box("이번 달 전체 소비", f"{total_sum:,.0f}원"), unsafe_allow_html=True)
-        st.markdown(info_box("이번 달 낭비 소비", f"{negative_sum:,.0f}원", "#dc3545"), unsafe_allow_html=True)
-        st.markdown(info_box("훈련생의 낭비율", f"{negative_percent:.1f}%", "#dc3545"), unsafe_allow_html=True)
+        st.markdown('<div class="section-header">📊 이번 달 현황</div>', unsafe_allow_html=True)
+        st.markdown(create_info_card("이번 달 전체 소비", f"{total_sum:,.0f}원"), unsafe_allow_html=True)
+        st.markdown(create_info_card("이번 달 낭비 소비", f"{negative_sum:,.0f}원", "#dc3545"), unsafe_allow_html=True)
+        st.markdown(create_info_card("훈련생의 낭비율", f"{negative_percent:.1f}%", "#dc3545"), unsafe_allow_html=True)
 
     # --- [Bottom Section] 예산 상세 정보 (1행 3열) ---
     # 예산이 정상적으로 설정되었을 때만 표시
     if monthly_budget >= 10000:
-        st.markdown("<br>", unsafe_allow_html=True) # 간격 추가
-        st.markdown("##### 📊 예산 상세 분석")
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown('<div class="section-header">📊 예산 상세 분석</div>', unsafe_allow_html=True)
         
         budget_usage_rate = (total_sum / monthly_budget) * 100
         waste_budget_rate = (negative_sum / monthly_budget) * 100
@@ -232,14 +274,29 @@ def main():
         
         with b_col1:
             usage_color = "#dc3545" if budget_usage_rate > 100 else "#007bff"
-            st.markdown(info_box("예산 소진율", f"{budget_usage_rate:.1f}%", color=usage_color, bg_color="#f8f9fa"), unsafe_allow_html=True)
+            st.markdown(create_info_card(
+                "예산 소진율", 
+                f"{budget_usage_rate:.1f}%", 
+                usage_color, 
+                "#f8f9fa"
+            ), unsafe_allow_html=True)
             
         with b_col2:
-            st.markdown(info_box("예산 잠식률 (낭비/예산)", f"{waste_budget_rate:.1f}%", color="#dc3545", bg_color="#f8f9fa"), unsafe_allow_html=True)
+            st.markdown(create_info_card(
+                "예산 잠식률 (낭비/예산)", 
+                f"{waste_budget_rate:.1f}%", 
+                "#dc3545", 
+                "#f8f9fa"
+            ), unsafe_allow_html=True)
             
         with b_col3:
-            remain_color = "black" if remaining_budget >= 0 else "#dc3545"
-            st.markdown(info_box("남은 예산 (잔액)", f"{remaining_budget:,.0f}원", color=remain_color, bg_color="#f8f9fa"), unsafe_allow_html=True)
+            remain_color = "#1f1f1f" if remaining_budget >= 0 else "#dc3545"
+            st.markdown(create_info_card(
+                "남은 예산 (잔액)", 
+                f"{remaining_budget:,.0f}원", 
+                remain_color, 
+                "#f8f9fa"
+            ), unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()

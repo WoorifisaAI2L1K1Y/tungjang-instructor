@@ -14,6 +14,32 @@ try:
 except ImportError:
     st.error("handle_sql.py 파일을 찾을 수 없습니다.")
 
+# 페이지 전체 배경색 설정
+page_bg_color = "#fcfcfb"
+st.markdown(f"""
+    <style>
+    .stApp {{
+        background-color: {page_bg_color};
+    }}
+    .metric-card {{
+        background-color: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
+        border: 1px solid #e0e0e0;
+        margin-bottom: 10px;
+    }}
+    .section-header {{
+        font-size: 24px;
+        font-weight: 700;
+        color: #1f1f1f;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e0e0e0;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
 # --- 카테고리 구조 정의 ---
 CATEGORY_STRUCTURE = {
     "식비": ["식자재/장보기", "외식", "배달/야식", "카페/간식", "술/유흥"],
@@ -236,7 +262,16 @@ with col_cancel:
 # ==========================================
 # [메인 화면] 캘린더 및 리스트 조회
 # ==========================================
-st.header("📊 소비 내역 조회")
+st.markdown("""
+<div style="text-align: center; padding: 20px 0; margin-bottom: 30px;">
+    <h1 style="color: #1f1f1f; font-size: 36px; font-weight: 700; margin: 0;">
+        📊 소비 내역 조회
+    </h1>
+    <p style="color: #666; font-size: 16px; margin-top: 10px;">
+        캘린더로 날짜를 선택하고 지출 내역을 확인하세요
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # 월 이동 버튼 (수정된 부분)
 col1, col2, col3 = st.columns([1, 3, 1])
@@ -344,6 +379,19 @@ try:
 except Exception as e:
     st.error(f"❌ 데이터 조회 오류: {e}")
 
+# 메트릭 카드 스타일 함수
+def create_metric_card(title, value, value_color="#1f1f1f"):
+    return f"""
+    <div class="metric-card">
+        <div style="font-size: 13px; color: #666; margin-bottom: 8px; font-weight: 500;">
+            {title}
+        </div>
+        <div style="font-size: 28px; font-weight: 700; color: {value_color};">
+            {value}
+        </div>
+    </div>
+    """
+
 st.markdown("""
 <style>
     [data-testid="stMetricValue"] { font-size: 24px; }
@@ -351,15 +399,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("---")
+st.markdown("<br>", unsafe_allow_html=True)
 col_a, col_b, col_c = st.columns(3)
 with col_a:
-    st.metric("💰 월 총 소비", f"{monthly_total:,}원")
-with col_b:
-    st.metric("📅 소비 일수", f"{len(daily_stats)}일")
-with col_c:
     avg_daily = monthly_total / len(daily_stats) if len(daily_stats) > 0 else 0
-    st.metric("📊 일평균 소비", f"{avg_daily:,.0f}원")
+    st.markdown(create_metric_card("💰 월 총 소비", f"{monthly_total:,}원"), unsafe_allow_html=True)
+with col_b:
+    st.markdown(create_metric_card("📅 소비 일수", f"{len(daily_stats)}일"), unsafe_allow_html=True)
+with col_c:
+    st.markdown(create_metric_card("📊 일평균 소비", f"{avg_daily:,.0f}원"), unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -406,11 +454,17 @@ elif state and state.get('eventClick'):
 selected_date_str = st.session_state.selected_date.strftime('%Y-%m-%d')
 
 if selected_date_str in daily_stats:
-    st.markdown("---")
-    st.subheader(f"📅 {selected_date_str} 소비 내역")
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(f'<div class="section-header">📅 {selected_date_str} 소비 내역</div>', unsafe_allow_html=True)
     
     stats = daily_stats[selected_date_str]
-    st.write(f"**일 총 소비: {stats['total']:,}원**")
+    st.markdown(f"""
+    <div style="background-color: #e7f5ff; padding: 15px; border-radius: 8px; border-left: 4px solid #1c7ed6; margin-bottom: 20px;">
+        <h4 style="color: #0b7285; margin: 0;">
+            일 총 소비: <span style="color: #1c7ed6; font-weight: 700;">{stats['total']:,}원</span>
+        </h4>
+    </div>
+    """, unsafe_allow_html=True)
     
     for idx, item in enumerate(stats['items']):
         with st.container():
@@ -463,5 +517,5 @@ if selected_date_str in daily_stats:
         st.dataframe(pd.DataFrame(detail_data), use_container_width=True, hide_index=True)
         
 elif selected_date_str:
-    st.markdown("---")
+    st.markdown("<br>", unsafe_allow_html=True)
     st.info(f"📆 {selected_date_str}에는 소비 내역이 없습니다.")

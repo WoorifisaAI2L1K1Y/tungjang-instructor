@@ -21,6 +21,36 @@ st.set_page_config(
     layout="wide"
 )
 
+# 페이지 전체 배경색 설정
+page_bg_color = "#fcfcfb"
+st.markdown(f"""
+    <style>
+    .stApp {{
+        background-color: {page_bg_color};
+    }}
+    .metric-card {{
+        background-color: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
+        border: 1px solid #e0e0e0;
+        margin-bottom: 10px;
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }}
+    .section-header {{
+        font-size: 24px;
+        font-weight: 700;
+        color: #1f1f1f;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e0e0e0;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
 # utils 경로
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.join(current_dir, "..")
@@ -31,8 +61,17 @@ try:
 except ImportError:
     st.error("utils/handle_sql.py 파일을 찾을 수 없습니다.")
 
-st.title("🪖 미래 소비 훈련소")
-st.caption("지금의 선택이 미래를 만든다. 숫자는 거짓말을 하지 않는다.")
+# 헤더 영역
+st.markdown("""
+<div style="text-align: center; padding: 20px 0; margin-bottom: 30px;">
+    <h1 style="color: #1f1f1f; font-size: 36px; font-weight: 700; margin: 0;">
+        🪖 미래 소비 훈련소
+    </h1>
+    <p style="color: #666; font-size: 16px; margin-top: 10px;">
+        지금의 선택이 미래를 만든다. 숫자는 거짓말을 하지 않는다.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # =========================
 # 예산 로드
@@ -69,7 +108,7 @@ def load_expense_data():
 
 df = load_expense_data()
 if df.empty:
-    st.warning("소비 데이터가 없어 훈련이 불가하다.")
+    st.warning("⚠️ 소비 데이터가 없어 훈련이 불가합니다.")
     st.stop()
 
 # =========================
@@ -172,31 +211,45 @@ tab1, tab2, tab3 = st.tabs(
 # TAB 1: 교관의 평가
 # =========================
 with tab1:
-    st.subheader("🪖 교관의 최종 평가")
+    st.markdown('<div class="section-header">🪖 교관의 최종 평가</div>', unsafe_allow_html=True)
 
     instructor_img_path = "./images/5-교관의_한마디.png"
-
-    st.markdown("""
-    <style>
-    .speech-bubble {
-        background: #FFF3CD;
-        border-radius: 12px;
-        padding: 16px;
-        font-weight: 600;
-        box-shadow: 1px 1px 4px rgba(0,0,0,0.15);
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
     if "coach_feedback" not in st.session_state:
         st.session_state.coach_feedback = "훈련병, 버튼을 눌러 평가를 받아라."
 
     col1, col2 = st.columns([1, 4])
     with col1:
-        st.image(instructor_img_path, use_container_width=True)
+        try:
+            st.image(instructor_img_path, use_container_width=True)
+        except:
+            st.write("🪖")
     with col2:
+        bubble_style = """
+        <style>
+        .speech-bubble {
+            background: #FFF3CD;
+            border-radius: 12px;
+            padding: 18px 22px;
+            font-weight: 600;
+            box-shadow: 2px 2px 8px rgba(0,0,0,0.15);
+            border: 2px solid rgba(0,0,0,0.08);
+            min-height: 90px;
+            display: flex;
+            align-items: center;
+        }
+        .bubble-text {
+            font-size: 15px;
+            font-weight: 600;
+            line-height: 1.6;
+            margin: 0;
+            font-family: 'Malgun Gothic', sans-serif;
+        }
+        </style>
+        """
+        st.markdown(bubble_style, unsafe_allow_html=True)
         st.markdown(
-            f"<div class='speech-bubble'>{st.session_state.coach_feedback}</div>",
+            f"<div class='speech-bubble'><p class='bubble-text'>{st.session_state.coach_feedback}</p></div>",
             unsafe_allow_html=True
         )
 
@@ -204,8 +257,9 @@ with tab1:
     month_df = df_reinterpreted[df_reinterpreted["month"] == current_month]
     waste_amount = month_df[month_df["재해석"].isin(["충동", "게으름"])]["cost"].sum()
 
-    if st.button("🧠 미래 평가 받기"):
-        with st.spinner("교관이 판단 중이다..."):
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🧠 미래 평가 받기", use_container_width=True):
+        with st.spinner("교관이 판단 중입니다..."):
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
@@ -227,43 +281,75 @@ with tab1:
 # TAB 2: 일일 생존비
 # =========================
 with tab2:
-    st.subheader("📆 일일 생존비")
+    st.markdown('<div class="section-header">📆 일일 생존비</div>', unsafe_allow_html=True)
+
+    # 메트릭 카드 함수
+    def create_metric_card(title, value, value_color="#1f1f1f", bg_color="white"):
+        return f"""
+        <div class="metric-card" style="background-color: {bg_color};">
+            <div>
+                <div style="font-size: 13px; color: #666; margin-bottom: 8px; font-weight: 500;">
+                    {title}
+                </div>
+                <div style="font-size: 28px; font-weight: 700; color: {value_color};">
+                    {value}
+                </div>
+            </div>
+        </div>
+        """
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.metric("나의 월 예산", f"{monthly_budget:,.0f}원")
+        st.markdown(create_metric_card("나의 월 예산", f"{monthly_budget:,.0f}원"), unsafe_allow_html=True)
 
     with col2:
-        st.metric("현재까지 사용한 금액", f"{used_this_month:,.0f}원")
+        st.markdown(create_metric_card("현재까지 사용한 금액", f"{used_this_month:,.0f}원"), unsafe_allow_html=True)
 
     if remaining_budget < 0:
-        st.error(f"예산 초과: {remaining_budget:,.0f}원")
+        st.error(f"⚠️ 예산 초과: {remaining_budget:,.0f}원")
     else:
-        st.success(f"사용 가능한 남은 금액: {remaining_budget:,.0f}원")
+        st.success(f"✅ 사용 가능한 남은 금액: {remaining_budget:,.0f}원")
 
-    st.markdown("---")
+    st.markdown("<br>", unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
-    c1.metric("📅 남은 일수", f"{remaining_days}일")
-    c2.metric("📌 하루 사용 가능 금액", f"{daily_available:,.0f}원")
+    c1.markdown(create_metric_card("📅 남은 일수", f"{remaining_days}일", "#1f1f1f", "#f8f9fa"), unsafe_allow_html=True)
+    c2.markdown(create_metric_card("📌 하루 사용 가능 금액", f"{daily_available:,.0f}원", "#1f1f1f", "#f8f9fa"), unsafe_allow_html=True)
 
 # =========================
 # TAB 3: 희망회로
 # =========================
 with tab3:
-    st.subheader("🔮 희망회로")
+    st.markdown('<div class="section-header">🔮 희망회로</div>', unsafe_allow_html=True)
+
+    # 메트릭 카드 함수
+    def create_metric_card(title, value, value_color="#1f1f1f", bg_color="white"):
+        return f"""
+        <div class="metric-card" style="background-color: {bg_color};">
+            <div>
+                <div style="font-size: 13px; color: #666; margin-bottom: 8px; font-weight: 500;">
+                    {title}
+                </div>
+                <div style="font-size: 28px; font-weight: 700; color: {value_color};">
+                    {value}
+                </div>
+            </div>
+        </div>
+        """
 
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("나의 월 예산", f"{monthly_budget:,.0f}원")
+        st.markdown(create_metric_card("나의 월 예산", f"{monthly_budget:,.0f}원"), unsafe_allow_html=True)
     with col2:
-        st.metric("예상 월 지출", f"{avg_monthly:,.0f}원")
+        st.markdown(create_metric_card("예상 월 지출", f"{avg_monthly:,.0f}원"), unsafe_allow_html=True)
 
-    months = st.slider("몇 개월간 버틸 것인가?", 1, 12, 6)
+    st.markdown("<br>", unsafe_allow_html=True)
+    months = st.slider("몇 개월간 버틸 것인가?", 1, 12, 6, help="저축 기간을 선택하세요")
     savings = (monthly_budget - avg_monthly) * months
 
-    st.metric("예상 모은 금액", f"{savings:,.0f}원")
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(create_metric_card("예상 모은 금액", f"{savings:,.0f}원", "#1f1f1f", "#f8f9fa"), unsafe_allow_html=True)
 
     destination = ""
     center_lat, center_lon, zoom = 37.5, 127, 3
@@ -314,5 +400,6 @@ with tab3:
     else:
         mark(64.9631, -19.0208, "아이슬란드", "Iceland")
 
+    st.markdown("<br>", unsafe_allow_html=True)
     st.success(f"🧭 이번 희망회로 결과: **{destination} 가능**")
     st_folium(fmap, height=450, width=800)
