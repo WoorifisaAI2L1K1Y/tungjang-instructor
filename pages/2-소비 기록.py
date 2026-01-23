@@ -73,8 +73,6 @@ def delete_expense(original_date, original_time, category, reason, cost, memo):
         WHERE date = %s AND TIME(time) = TIME(%s) AND category = %s AND reason = %s AND cost = %s
         LIMIT 1
         """
-        # 메모는 NULL일 수도 있고 빈 문자열일 수도 있어서 조건에서 뺄 수도 있지만, 
-        # 정확한 매칭을 위해 일단 cost까지만 조건으로 겁니다 (일반적으로 충분).
         handle_sql.execute_query(query, (original_date, original_time, category, reason, cost))
         return True
     except Exception as e:
@@ -106,6 +104,23 @@ if 'selected_date' not in st.session_state:
 # [콜백 함수] 버튼 클릭 시 로직 처리
 # ==========================================
 
+# 0. 월 이동 콜백 (수정된 부분)
+def change_month_callback(amount):
+    """
+    amount: -1 (이전 달), 1 (다음 달)
+    """
+    curr = st.session_state.current_date
+    # 월 계산 로직
+    new_year = curr.year + (curr.month + amount - 1) // 12
+    new_month = (curr.month + amount - 1) % 12 + 1
+    
+    # 날짜를 1일로 설정하여 '31일' 같은 날짜 오류 방지
+    try:
+        st.session_state.current_date = curr.replace(year=new_year, month=new_month, day=1)
+    except ValueError:
+        # 혹시라도 날짜 문제 발생 시 1일로 강제 설정
+        st.session_state.current_date = curr.replace(year=new_year, month=new_month, day=1)
+
 # 1. 폼 초기화 콜백
 def reset_form_callback():
     st.session_state.current_date = datetime.now().date()
@@ -129,7 +144,8 @@ def submit_add_callback():
         st.session_state.current_memo
     )
     if success:
-        st.toast("✅ 저장 완료!", icon="💾") # toast 메시지 사용 추천
+        st.toast("✅ 저장 완료!", icon="💾")
+        st.cache_data.clear()
         reset_form_callback()
 
 # 3. 수정(Update) 콜백
@@ -163,7 +179,6 @@ def delete_expense_callback(item):
     )
     if success:
         st.toast("🗑️ 삭제 완료!", icon="✅")
-        # 만약 수정 중이던 항목을 삭제했다면 폼 초기화
         if st.session_state.edit_mode and st.session_state.edit_item == item:
             reset_form_callback()
 
@@ -193,6 +208,7 @@ def load_edit_data_callback(item):
 # ==========================================
 st.sidebar.header("✏️ 소비 내역 수정" if st.session_state.edit_mode else "📝 소비 내역 입력")
 
+# 여기서 key="current_date"가 바인딩되어 있어서 외부에서 직접 수정 시 에러가 났던 것임
 date = st.sidebar.date_input("날짜", key="current_date")
 time = st.sidebar.time_input("시간", key="current_time")
 
@@ -222,17 +238,12 @@ with col_cancel:
 # ==========================================
 st.header("📊 소비 내역 조회")
 
-# 월 이동 버튼
+# 월 이동 버튼 (수정된 부분)
 col1, col2, col3 = st.columns([1, 3, 1])
 
 with col1:
-    if st.button("◀ 지난 달", use_container_width=True):
-        current = st.session_state.current_date
-        if current.month == 1:
-            st.session_state.current_date = current.replace(year=current.year - 1, month=12)
-        else:
-            st.session_state.current_date = current.replace(month=current.month - 1)
-        st.rerun()
+    # on_click으로 변경하여 콜백 함수 호출
+    st.button("◀ 지난 달", on_click=change_month_callback, args=(-1,), use_container_width=True)
 
 with col2:
     st.markdown(
@@ -241,13 +252,8 @@ with col2:
     )
 
 with col3:
-    if st.button("다음 달 ▶", use_container_width=True):
-        current = st.session_state.current_date
-        if current.month == 12:
-            st.session_state.current_date = current.replace(year=current.year + 1, month=1)
-        else:
-            st.session_state.current_date = current.replace(month=current.month + 1)
-        st.rerun()
+    # on_click으로 변경하여 콜백 함수 호출
+    st.button("다음 달 ▶", on_click=change_month_callback, args=(1,), use_container_width=True)
 
 current_year = st.session_state.current_date.year
 current_month = st.session_state.current_date.month
