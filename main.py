@@ -15,7 +15,7 @@ except ImportError:
     st.error("handle_sql.py 파일을 찾을 수 없습니다.")
 
 # --- [1. 기본 설정 및 배경색 지정] ---
-st.set_page_config(page_title="텅장 훈련소", layout="centered")
+st.set_page_config(page_title="텅장 훈련소", page_icon="💸🪖",layout="wide")
 
 # 페이지 전체 배경색 설정
 page_bg_color = "#fcfcfb"
