@@ -308,8 +308,11 @@ def main():
 
         # [좌측] 상관관계 분석
         with col_left:
-            st.markdown("##### 📉 너의 낭비가 총 지출에 미치는 영향이다.")
-            
+            st.markdown("""
+            ##### :red[낭비는 너가 게으르고, 충동 구매를 한 지출이다.]
+            ##### 📉 아래는 너의 낭비가 총 지출에 미치는 영향이다!
+            """)
+                        
             # 1. 데이터 집계
             monthly_agg = df.groupby("month").apply(
                 lambda x: pd.Series({
@@ -332,19 +335,19 @@ def main():
                 if corr_value >= 0.7:
                     img_path = os.path.join(img_dir, '4-화남.png')
                     bg_color = "#ffeaea" 
-                    status_text = f"낭비가 총 지출을 <span style='color: #e03131;'>직접적으로 폭발시키는</span> 상관계수 {val_html}이다!<br>정신이 있는 건가?! 당장 충동을 억제하고 실시! 😡"
+                    status_text = f"낭비가 총 지출을 <span style='color: #e03131;'>직접적으로 폭발시키는</span> 상관계수가 {val_html}이다!<br>정신이 있는 건가?! 당장 충동을 억제하고 실시! 😡"
                 elif corr_value >= 0.3:
                     img_path = os.path.join(img_dir, '3-짜증.png')
                     bg_color = "#fff3cd"
-                    status_text = f"낭비가 늘면 지출도 <span style='color: #e8590c;'>따라서 증가하는</span> 상관계수 {val_html}다!<br>경고한다! 전력 누수가 심각하다. 정신 차려라! 😠"
+                    status_text = f"낭비가 늘면 지출도 <span style='color: #e8590c;'>따라서 증가하는</span> 상관계수가 {val_html}다!<br>경고한다! 너의 낭비가 심각하다. 정신 차려라! 😠"
                 elif corr_value > -0.3:
                     img_path = os.path.join(img_dir, '1-온화.png')
                     bg_color = "#d4edda"
-                    status_text = f"낭비와 지출이 <span style='color: #2b8a3e;'>서로 영향이 없는</span> 상관계수 {val_html}.<br>보고! 특이사항 없음. 생명 유지비(고정비)를 점검하라. 🤔"
+                    status_text = f"낭비와 지출이 <span style='color: #2b8a3e;'>서로 영향이 없는</span> 상관계수가 {val_html}.<br>보고! 특이사항 없음. 생명 유지비(고정비)를 점검하라. 🤔"
                 else:
                     img_path = os.path.join(img_dir, '2-걱정.png')
                     bg_color = "#e2e3e5"
-                    status_text = f"낭비를 줄였는데 지출이 늘어나는 <span style='color: #5f3dc4;'>역방향</span> 상관계수 {val_html} 감지!<br>비상! 기현상이다. 정밀 타격이 필요하다! 😨"
+                    status_text = f"낭비를 줄였는데 지출이 늘어나는 <span style='color: #5f3dc4;'>역방향</span> 상관계수가 {val_html} 감지!<br>비상! 기현상이다. 정밀 타격이 필요하다! 😨"
 
                 col_img, col_bubble = st.columns([1, 2.5])
 

@@ -16,8 +16,11 @@
 <div markdown="1">
 
 <br>
+<img src="./images/wibee.svg" alt="멋진 사회초년생의 꿈" width="200">
 
 "나는... 멋진 커리어와 재력을 겸비한 **사회초년생**이 되고 싶었다..."
+<br>
+
 <br>
 하지만 현실은... 돈이 없어. 💸
 
@@ -27,7 +30,7 @@
 
 <br>
 
-<img src="./images/story_phone1.jpeg" alt="옆사람의 최신 스마트폰" width="500">
+<img src="./images/story_phone1.jpeg" alt="옆사람의 최신 스마트폰" width="300">
 <br>
 <br>
 
