@@ -207,27 +207,6 @@ AI 소비 교관이 실시간 데이터에 기반하여 사용자의 정신상�
 - **인터랙티브 맵**: 예상 저축액으로 갈 수 있는 여행지를 세계 지도 위에 마커로 표시합니다.
 - **경고 시스템**: 저축액이 마이너스일 경우, 목적지가 **'논산 훈련소'**로 강제 고정되어 강력한 경각심을 줍니다.
 ---
-## 📂 폴더 구조 (Directory Structure)
-
-```bash
-tungjang-instructor/
-├── .gitignore             # Git 제외 파일 설정
-├── README.md              # 프로젝트 문서
-├── main.py                # 🏠 메인 훈련장 (앱 진입점)
-├── requirements.txt       # 의존성 패키지 목록
-├── data/
-│   ├── budget_settings.json  # 예산 설정 데이터
-│   ├── card.csv              # 초기 데이터셋
-│   └── example_data.csv      # 샘플 데이터
-├── images/                   # 교관 이미지 및 로고 에셋
-├── pages/
-│   ├── 2-소비 기록.py        # 📝 소비 입력 및 수정/삭제 기능
-│   ├── 3-지금까지의 나.py    # 📊 과거 소비 분석 및 시각화
-│   └── 4-앞으로의 나.py      # 🔮 미래 자산 시뮬레이션 (AI 코칭)
-└── utils/
-    └── handle_sql.py         # 🔌 DB 연결 및 CRUD 유틸리티
-```
----
 ## 🧗‍♂️ 개발 과정의 난관과 해결 (Challenges & Solutions)
 
 프로젝트를 진행하며 마주쳤던 주요 기술적 난관들과 이를 극복한 과정입니다.
@@ -260,7 +239,27 @@ tungjang-instructor/
 | **AI Intelligence** | ![OpenAI](https://img.shields.io/badge/-GPT_4o_mini-412991?style=flat-square&logo=openai&logoColor=white) | 개인화된 소비 피드백 및 코칭 메시지 생성 |
 
 ---
+## 📂 폴더 구조 (Directory Structure)
 
+```bash
+tungjang-instructor/
+├── .gitignore             # Git 제외 파일 설정
+├── README.md              # 프로젝트 문서
+├── main.py                # 🏠 메인 훈련장 (앱 진입점)
+├── requirements.txt       # 의존성 패키지 목록
+├── data/
+│   ├── budget_settings.json  # 예산 설정 데이터
+│   ├── card.csv              # 초기 데이터셋
+│   └── example_data.csv      # 샘플 데이터
+├── images/                   # 교관 이미지 및 로고 에셋
+├── pages/
+│   ├── 2-소비 기록.py        # 📝 소비 입력 및 수정/삭제 기능
+│   ├── 3-지금까지의 나.py    # 📊 과거 소비 분석 및 시각화
+│   └── 4-앞으로의 나.py      # 🔮 미래 자산 시뮬레이션 (AI 코칭)
+└── utils/
+    └── handle_sql.py         # 🔌 DB 연결 및 CRUD 유틸리티
+```
+---
 ## 🚀 훈련소 입소 방법 (Getting Started)
 
 훈련을 시작하려면 아래 절차를 따르십시오.
