@@ -191,7 +191,7 @@ def load_edit_data_callback(item):
 # ==========================================
 # [사이드바] 입력 및 수정 폼
 # ==========================================
-st.sidebar.header("✏️ 지출 내역 수정" if st.session_state.edit_mode else "📝 지출 내역 입력")
+st.sidebar.header("✏️ 소비 내역 수정" if st.session_state.edit_mode else "📝 소비 내역 입력")
 
 date = st.sidebar.date_input("날짜", key="current_date")
 time = st.sidebar.time_input("시간", key="current_time")
@@ -220,13 +220,13 @@ with col_cancel:
 # ==========================================
 # [메인 화면] 캘린더 및 리스트 조회
 # ==========================================
-st.header("📊 지출 내역 조회")
+st.header("📊 소비 내역 조회")
 
 # 월 이동 버튼
 col1, col2, col3 = st.columns([1, 3, 1])
 
 with col1:
-    if st.button("◀ 전월", use_container_width=True):
+    if st.button("◀ 지난 달", use_container_width=True):
         current = st.session_state.current_date
         if current.month == 1:
             st.session_state.current_date = current.replace(year=current.year - 1, month=12)
@@ -241,7 +241,7 @@ with col2:
     )
 
 with col3:
-    if st.button("다음월 ▶", use_container_width=True):
+    if st.button("다음 달 ▶", use_container_width=True):
         current = st.session_state.current_date
         if current.month == 12:
             st.session_state.current_date = current.replace(year=current.year + 1, month=1)
@@ -348,12 +348,12 @@ st.markdown("""
 st.markdown("---")
 col_a, col_b, col_c = st.columns(3)
 with col_a:
-    st.metric("💰 월 총 지출", f"{monthly_total:,}원")
+    st.metric("💰 월 총 소비", f"{monthly_total:,}원")
 with col_b:
-    st.metric("📅 지출 일수", f"{len(daily_stats)}일")
+    st.metric("📅 소비 일수", f"{len(daily_stats)}일")
 with col_c:
     avg_daily = monthly_total / len(daily_stats) if len(daily_stats) > 0 else 0
-    st.metric("📊 일평균 지출", f"{avg_daily:,.0f}원")
+    st.metric("📊 일평균 소비", f"{avg_daily:,.0f}원")
 
 st.markdown("---")
 
@@ -401,10 +401,10 @@ selected_date_str = st.session_state.selected_date.strftime('%Y-%m-%d')
 
 if selected_date_str in daily_stats:
     st.markdown("---")
-    st.subheader(f"📅 {selected_date_str} 지출 내역")
+    st.subheader(f"📅 {selected_date_str} 소비 내역")
     
     stats = daily_stats[selected_date_str]
-    st.write(f"**일 총 지출: {stats['total']:,}원**")
+    st.write(f"**일 총 소비: {stats['total']:,}원**")
     
     for idx, item in enumerate(stats['items']):
         with st.container():
@@ -458,4 +458,4 @@ if selected_date_str in daily_stats:
         
 elif selected_date_str:
     st.markdown("---")
-    st.info(f"📆 {selected_date_str}에는 지출 내역이 없습니다.")
+    st.info(f"📆 {selected_date_str}에는 소비 내역이 없습니다.")
