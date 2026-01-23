@@ -34,7 +34,7 @@ def load_and_process_data():
         # SQL 쿼리 작성
         query = """
             SELECT date, time, category, reason, cost, memo
-            FROM sample
+            FROM card
             ORDER BY date DESC, time DESC
         """
         

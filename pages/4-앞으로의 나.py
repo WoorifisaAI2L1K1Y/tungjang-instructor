@@ -41,7 +41,7 @@ def load_expense_data():
         # DB 연결 정보는 handle_sql 내부에서 처리
         query = """
         SELECT date, time, category, reason, cost
-        FROM sample
+        FROM card
         """
         
         # [변경됨] handle_sql을 통해 DataFrame으로 가져옴

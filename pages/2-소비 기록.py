@@ -138,7 +138,7 @@ try:
         reason,
         cost,
         memo
-    FROM sample
+    FROM card
     WHERE date >= '{start_date}' 
         AND date < '{end_date}'
     ORDER BY date, time
