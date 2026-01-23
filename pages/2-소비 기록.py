@@ -62,138 +62,110 @@ def update_expense(date, time, category, reason, cost, memo, original_date, orig
         st.error(f"데이터 수정 오류: {e}")
         return False
 
-# 세션 스테이트 초기화
+# --- 초기 설정 및 세션 스테이트 초기화 ---
 if 'current_date' not in st.session_state:
-    st.session_state.current_date = datetime.now()
-
-# 선택된 날짜 초기화 (디폴트: 오늘)
+    st.session_state.current_date = datetime.now().date()
+if 'current_time' not in st.session_state:
+    st.session_state.current_time = datetime.now().time()
 if 'selected_date' not in st.session_state:
     st.session_state.selected_date = datetime.now().date()
-
-# 수정 모드 및 수정할 항목 정보
 if 'edit_mode' not in st.session_state:
     st.session_state.edit_mode = False
 if 'edit_item' not in st.session_state:
     st.session_state.edit_item = None
 
-# 사이드바 헤더 (수정 모드에 따라 변경)
+# --- 사이드바 헤더 및 수정 모드 데이터 로드 ---
 if st.session_state.edit_mode:
     st.sidebar.header("✏️ 지출 내역 수정")
+    item = st.session_state.edit_item
+    
+    # 수정 버튼을 눌렀을 때 최초 1회만 위젯 값을 수정 데이터로 동기화
+    if st.session_state.get('needs_sync', False):
+        try:
+            st.session_state.input_date = datetime.strptime(item['original_date'], '%Y-%m-%d').date()
+            time_parts = item['original_time'].split(':')
+            st.session_state.input_time = datetime.now().replace(
+                hour=int(time_parts[0]), 
+                minute=int(time_parts[1]) if len(time_parts) > 1 else 0
+            ).time()
+        except:
+            pass
+        st.session_state.needs_sync = False # 동기화 완료 후 플래그 해제
 else:
     st.sidebar.header("📝 지출 내역 입력")
 
-# 수정 모드인 경우 원본 데이터 표시
-if st.session_state.edit_mode and st.session_state.edit_item:
-    st.sidebar.info(f"**수정 중:** {st.session_state.edit_item.get('category', '')} - {st.session_state.edit_item.get('reason', '')}")
+# --- 1. 날짜/시간 입력 ---
+# value 대신 key를 사용하면 사용자가 입력을 바꿀 때마다 세션 스테이트에 자동 저장됩니다.
+date = st.sidebar.date_input("날짜", key="current_date")
+time = st.sidebar.time_input("시간", key="current_time")
 
-# 1. 날짜/시간 입력 (수정 모드일 때는 원본 값 사용, 아니면 현재 날짜/시간)
+# --- 2. 대분류 선택 ---
+category_options = list(CATEGORY_STRUCTURE.keys())
+curr_cat_idx = 0
 if st.session_state.edit_mode and st.session_state.edit_item:
-    # 수정 모드: 원본 데이터의 날짜/시간 사용
-    original_date_str = st.session_state.edit_item.get('original_date', '')
-    original_time_str = st.session_state.edit_item.get('original_time', '')
-    
-    try:
-        if original_date_str:
-            edit_date = datetime.strptime(original_date_str, '%Y-%m-%d').date()
-        else:
-            edit_date = datetime.now().date()
-    except:
-        edit_date = datetime.now().date()
-    
-    try:
-        if original_time_str:
-            time_parts = original_time_str.split(':')
-            edit_time = datetime.now().replace(hour=int(time_parts[0]), minute=int(time_parts[1]) if len(time_parts) > 1 else 0, second=0).time()
-        else:
-            edit_time = datetime.now().time()
-    except:
-        edit_time = datetime.now().time()
-    
-    date = st.sidebar.date_input("날짜", value=edit_date)
-    time = st.sidebar.time_input("시간", value=edit_time)
-else:
-    # 입력 모드: 현재 날짜/시간을 디폴트로 사용
-    date = st.sidebar.date_input("날짜", value=datetime.now().date())
-    time = st.sidebar.time_input("시간", value=datetime.now().time())
+    orig_cat = st.session_state.edit_item.get('category')
+    if orig_cat in category_options:
+        curr_cat_idx = category_options.index(orig_cat)
 
-# 2. 대분류 선택
-if st.session_state.edit_mode and st.session_state.edit_item:
-    # 수정 모드: 원본 카테고리 사용
-    original_category = st.session_state.edit_item.get('category', list(CATEGORY_STRUCTURE.keys())[0])
-    category = st.sidebar.selectbox(
-        "카테고리 (대분류)", 
-        options=list(CATEGORY_STRUCTURE.keys()),
-        index=list(CATEGORY_STRUCTURE.keys()).index(original_category) if original_category in CATEGORY_STRUCTURE else 0
-    )
-else:
-    category = st.sidebar.selectbox(
-        "카테고리 (대분류)", 
-        options=list(CATEGORY_STRUCTURE.keys())
-    )
+category = st.sidebar.selectbox(
+    "카테고리 (대분류)", 
+    options=category_options,
+    index=curr_cat_idx
+)
 
-# 3. 중분류 선택 (선택된 대분류에 맞춰 목록 갱신)
+# --- 3. 중분류 선택 ---
 reason_options = CATEGORY_STRUCTURE.get(category, [])
+curr_reason_idx = 0
 if st.session_state.edit_mode and st.session_state.edit_item:
-    # 수정 모드: 원본 사유 사용
-    original_reason = st.session_state.edit_item.get('reason', reason_options[0] if reason_options else '')
-    if original_reason in reason_options:
-        reason = st.sidebar.selectbox(
-            "사유 (중분류)",
-            options=reason_options,
-            index=reason_options.index(original_reason)
-        )
-    else:
-        reason = st.sidebar.selectbox(
-            "사유 (중분류)",
-            options=reason_options
-        )
-else:
-    reason = st.sidebar.selectbox(
-        "사유 (중분류)",
-        options=reason_options
-    )
+    orig_reason = st.session_state.edit_item.get('reason')
+    if orig_reason in reason_options:
+        curr_reason_idx = reason_options.index(orig_reason)
 
-# 4. 금액 및 메모
-if st.session_state.edit_mode and st.session_state.edit_item:
-    # 수정 모드: 원본 값 사용
-    original_cost = st.session_state.edit_item.get('cost', 0)
-    original_memo = st.session_state.edit_item.get('memo', '')
-    cost = st.sidebar.number_input("금액 (원)", min_value=0, step=1000, value=int(original_cost))
-    memo = st.sidebar.text_input("메모", value=original_memo, max_chars=50)
+reason = st.sidebar.selectbox("사유 (중분류)", options=reason_options, index=curr_reason_idx)
+
+# --- 4. 금액 및 메모 ---
+# 금액과 메모는 위젯 재실행 시 초기화되는 문제를 방지하기 위해 
+# 수정 모드일 때만 value를 명시적으로 할당합니다.
+if st.session_state.edit_mode:
+    cost = st.sidebar.number_input("금액 (원)", min_value=0, step=1000, value=int(st.session_state.edit_item.get('cost', 0)))
+    memo = st.sidebar.text_input("메모", value=st.session_state.edit_item.get('memo', ''), max_chars=50)
 else:
     cost = st.sidebar.number_input("금액 (원)", min_value=0, step=1000)
     memo = st.sidebar.text_input("메모", placeholder="상세 내용을 입력하세요", max_chars=50)
 
-# 5. 저장/수정 버튼
+# --- 5. 저장/수정/취소 버튼 ---
 col_save, col_cancel = st.sidebar.columns(2)
 
 with col_save:
     if st.session_state.edit_mode:
         if st.button("💾 수정 저장", use_container_width=True):
-            if st.session_state.edit_item:
-                original_date = st.session_state.edit_item.get('original_date', '')
-                original_time = st.session_state.edit_item.get('original_time', '')
-                original_category = st.session_state.edit_item.get('category', '')
-                original_reason = st.session_state.edit_item.get('reason', '')
+            # update_expense 함수 호출 시 모든 인자를 정확히 전달
+            if update_expense(
+                date.strftime("%Y-%m-%d"),
+                time.strftime("%H:%M:%S"),
+                category,
+                reason,
+                int(cost),
+                memo,
+                st.session_state.edit_item['original_date'],
+                st.session_state.edit_item['original_time'],
+                st.session_state.edit_item['category'],
+                st.session_state.edit_item['reason']
+            ):
+                st.sidebar.success("✅ 수정 완료!")
+                st.session_state.edit_mode = False
+                st.session_state.edit_item = None
                 
-                if update_expense(
-                    date.strftime("%Y-%m-%d"),
-                    time.strftime("%H:%M:%S"),
-                    category,
-                    reason,
-                    int(cost),
-                    memo,
-                    original_date,
-                    original_time,
-                    original_category,
-                    original_reason
-                ):
-                    st.sidebar.success("✅ 수정 완료!")
-                    st.session_state.edit_mode = False
-                    st.session_state.edit_item = None
-                    st.rerun()
+                # 위젯 에러 방지를 위해 del 사용
+                if 'current_date' in st.session_state:
+                    del st.session_state.current_date
+                if 'current_time' in st.session_state:
+                    del st.session_state.current_time
+                st.rerun()
     else:
+        # 입력 모드 저장 버튼
         if st.button("💾 저장", use_container_width=True):
+            # add_expense 함수 호출 시 정의된 6개 인자 모두 전달
             if add_expense(
                 date.strftime("%Y-%m-%d"),
                 time.strftime("%H:%M:%S"),
@@ -203,6 +175,12 @@ with col_save:
                 memo
             ):
                 st.sidebar.success("✅ 저장 완료!")
+                
+                # 위젯 에러 방지를 위해 del 사용
+                if 'current_date' in st.session_state:
+                    del st.session_state.current_date
+                if 'current_time' in st.session_state:
+                    del st.session_state.current_time
                 st.rerun()
 
 with col_cancel:
@@ -210,9 +188,14 @@ with col_cancel:
         if st.button("❌ 취소", use_container_width=True):
             st.session_state.edit_mode = False
             st.session_state.edit_item = None
+            
+            # 취소 시에도 초기화하고 싶다면 del
+            if 'current_date' in st.session_state:
+                del st.session_state.current_date
+            if 'current_time' in st.session_state:
+                del st.session_state.current_time
             st.rerun()
 
-        
 # 메인 화면 - 데이터 조회
 st.header("📊 지출 내역 조회")
 
@@ -407,22 +390,35 @@ state = calendar(
 
 # 날짜 클릭 시 선택된 날짜 업데이트
 if state and state.get('dateClick'):
-    clicked_date_str = state['dateClick']['date'][:10]
+    # state['dateClick']['date']는 "2024-05-17T00:00:00.000Z" 형태일 수 있음
+    clicked_raw = state['dateClick']['date']
+    
     try:
-        clicked_date = datetime.strptime(clicked_date_str, '%Y-%m-%d').date()
-        st.session_state.selected_date = clicked_date
-    except:
-        pass
+        # T를 기준으로 잘라서 날짜만 가져오거나, 9시간을 더해줍니다.
+        if 'T' in clicked_raw:
+            # ISO 형식일 경우 파싱 후 9시간 더하기
+            dt_obj = datetime.fromisoformat(clicked_raw.replace('Z', '+00:00'))
+            kst_date = (dt_obj + timedelta(hours=9)).date()
+            st.session_state.selected_date = kst_date
+        else:
+            # 단순 문자열일 경우
+            st.session_state.selected_date = datetime.strptime(clicked_raw[:10], '%Y-%m-%d').date()
+    except Exception as e:
+        st.error(f"날짜 선택 오류: {e}")
 
-# 이벤트 클릭 시 선택된 날짜 업데이트
+# --- 캘린더 이벤트 클릭 시 선택된 날짜 업데이트 (시차 보정) ---
 elif state and state.get('eventClick'):
-    event_data = state['eventClick']['event']
-    clicked_date_str = event_data.get('start', '')[:10]
+    event_raw = state['eventClick']['event']['start']
+    
     try:
-        clicked_date = datetime.strptime(clicked_date_str, '%Y-%m-%d').date()
-        st.session_state.selected_date = clicked_date
-    except:
-        pass
+        if 'T' in event_raw:
+            dt_obj = datetime.fromisoformat(event_raw.replace('Z', '+00:00'))
+            kst_date = (dt_obj + timedelta(hours=9)).date()
+            st.session_state.selected_date = kst_date
+        else:
+            st.session_state.selected_date = datetime.strptime(event_raw[:10], '%Y-%m-%d').date()
+    except Exception as e:
+        st.error(f"이벤트 선택 오류: {e}")
 
 # 선택된 날짜의 지출 내역 표시 (디폴트: 오늘 날짜)
 selected_date_str = st.session_state.selected_date.strftime('%Y-%m-%d')
