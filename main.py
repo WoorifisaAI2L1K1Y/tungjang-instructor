@@ -129,16 +129,16 @@ def main():
         
         if budget_usage_rate <= 30:
             img_path, bg_color = './images/1-온화.png', "#D4EDDA"
-            status_text = f"예산의 {budget_usage_rate:.1f}%만 사용했군.<br>아주 훌륭해! 이 페이스를 유지하게. 😊"
+            status_text = f"예산의 {budget_usage_rate:.1f}%만 사용했군.<br>아주 훌륭해! 이 페이스를 유지하게.😊"
         elif budget_usage_rate <= 60:
             img_path, bg_color = './images/2-걱정.png', "#FFF3CD"
-            status_text = f"벌써 예산의 {budget_usage_rate:.1f}% 을 썼네.<br>지출 속도를 조금 늦추는 게 좋겠어. 😟"
-        elif budget_usage_rate <= 90:
+            status_text = f"벌써 예산의 {budget_usage_rate:.1f}%을 썼다.<br>적당히 돈을 써야 된다!😟"
+        elif budget_usage_rate <= 100:
             img_path, bg_color = './images/3-짜증.png', "#F8D7DA"
-            status_text = f"비상! 예산이 거의 바닥났어({budget_usage_rate:.1f}%)!<br>이제부터는 숨만 쉬고 살게! 😠"
+            status_text = f"비상! 예산이 거의 바닥났다!<br>이제부터는 숨만 쉬고 살아라!😠"
         else:
             img_path, bg_color = './images/4-화남.png', "#F8D7DA"
-            status_text = f"곧 예산 초과다!!<br>훈련생, 자네는 계획이란 게 없나?! 😡"
+            status_text = f"예산 초과다!!<br>훈련생, 자네는 계획이란 게 없나?!😡"
 
     # --- [5. 메인 레이아웃 구성] ---
     
