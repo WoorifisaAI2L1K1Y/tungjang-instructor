@@ -15,11 +15,7 @@ from datetime import datetime
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-st.set_page_config(
-    page_title="앞으로의 나",
-    page_icon="🪖",
-    layout="wide"
-)
+st.set_page_config(page_title="텅장 훈련소", page_icon="💸🪖", layout="wide")
 
 # 페이지 전체 배경색 설정
 page_bg_color = "#fcfcfb"
@@ -214,42 +210,61 @@ with tab1:
     st.markdown('<div class="section-header">🪖 교관의 최종 평가</div>', unsafe_allow_html=True)
 
     instructor_img_path = "./images/5-교관의_한마디.png"
+    bg_color = "#FFF3CD"  # 말풍선 배경색
 
     if "coach_feedback" not in st.session_state:
         st.session_state.coach_feedback = "훈련병, 버튼을 눌러 평가를 받아라."
 
-    col1, col2 = st.columns([1, 4])
-    with col1:
+    # 메인 페이지와 동일한 레이아웃: 이미지와 말풍선 나란히
+    sub_img, sub_bubble = st.columns([1.8, 2.5])
+    
+    with sub_img:
         try:
             st.image(instructor_img_path, use_container_width=True)
         except:
             st.write("🪖")
-    with col2:
-        bubble_style = """
+    
+    with sub_bubble:
+        bubble_style = f"""
         <style>
-        .speech-bubble {
-            background: #FFF3CD;
+        .speech-bubble {{
+            position: relative;
+            background: {bg_color};
             border-radius: 12px;
             padding: 18px 22px;
-            font-weight: 600;
+            color: #333;
             box-shadow: 2px 2px 8px rgba(0,0,0,0.15);
-            border: 2px solid rgba(0,0,0,0.08);
-            min-height: 90px;
+            margin-left: 10px;
             display: flex;
             align-items: center;
-        }
-        .bubble-text {
+            min-height: 90px;
+            border: 2px solid rgba(0,0,0,0.08);
+        }}
+        .speech-bubble:after {{
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            width: 0;
+            height: 0;
+            border: 14px solid transparent;
+            border-right-color: {bg_color};
+            border-left: 0;
+            margin-top: -14px;
+            margin-left: -14px;
+        }}
+        .bubble-text {{
             font-size: 15px;
             font-weight: 600;
             line-height: 1.6;
             margin: 0;
             font-family: 'Malgun Gothic', sans-serif;
-        }
+        }}
         </style>
         """
         st.markdown(bubble_style, unsafe_allow_html=True)
         st.markdown(
-            f"<div class='speech-bubble'><p class='bubble-text'>{st.session_state.coach_feedback}</p></div>",
+            f'<div class="speech-bubble"><p class="bubble-text">{st.session_state.coach_feedback}</p></div>',
             unsafe_allow_html=True
         )
 
@@ -354,25 +369,38 @@ with tab3:
     destination = ""
     center_lat, center_lon, zoom = 37.5, 127, 3
 
+    # 1. 저축액에 따른 목적지 및 지도 중심 좌표 설정
     if savings < 0:
         destination = "논산 훈련소"
-        center_lat, center_lon, zoom = 36.187, 127.098, 11
+        # 육군훈련소 (연무대)
+        center_lat, center_lon, zoom = 36.1223, 127.1139, 13
+        
     elif savings < 500_000:
-        destination = "국내 여행"
-        center_lat, center_lon, zoom = 36.5, 127.8, 6
+        destination = "부산"
+        # 부산 시청 및 중심가
+        center_lat, center_lon, zoom = 35.1796, 129.0756, 11
+        
     elif savings < 1_000_000:
         destination = "일본"
-        center_lat, center_lon, zoom = 35.6762, 139.6503, 5
+        # 도쿄 (일본의 대표 도시)
+        center_lat, center_lon, zoom = 35.6895, 139.6917, 10
+        
     elif savings < 2_000_000:
-        destination = "두바이"
-        center_lat, center_lon, zoom = 25.2048, 55.2708, 5
+        destination = "싱가포르"
+        # 싱가포르 (도시 국가)
+        center_lat, center_lon, zoom = 1.3521, 103.8198, 11
+        
     elif savings < 3_000_000:
-        destination = "파리"
-        center_lat, center_lon, zoom = 48.8566, 2.3522, 5
+        destination = "호주"
+        # 시드니 (호주의 대표 랜드마크)
+        center_lat, center_lon, zoom = -33.8688, 151.2093, 11
+        
     else:
-        destination = "아이슬란드"
-        center_lat, center_lon, zoom = 64.9631, -19.0208, 4
+        destination = "뉴욕"
+        # 뉴욕 맨해튼
+        center_lat, center_lon, zoom = 40.7128, -74.0060, 11
 
+    # 2. 지도 생성
     fmap = folium.Map(
         location=[center_lat, center_lon],
         zoom_start=zoom,
@@ -387,18 +415,19 @@ with tab3:
             icon=folium.Icon(icon="plane", prefix="fa", color="blue")
         ).add_to(fmap)
 
+    # 3. 목적지에 맞는 마커 표시 (상단 좌표와 일치시킴)
     if destination == "논산 훈련소":
-        mark(36.187, 127.098, "논산 훈련소", "Nonsan Training Center")
-    elif destination == "국내 여행":
-        mark(37.5665, 126.9780, "국내 여행", "Domestic Trip")
+        mark(36.1223, 127.1139, "논산 훈련소", "Nonsan Training Center")
+    elif destination == "부산":
+        mark(35.1796, 129.0756, "부산 여행", "Busan")
     elif destination == "일본":
-        mark(35.6762, 139.6503, "일본 여행", "Japan")
-    elif destination == "두바이":
-        mark(25.2048, 55.2708, "두바이", "Dubai")
-    elif destination == "파리":
-        mark(48.8566, 2.3522, "파리", "Paris")
+        mark(35.6895, 139.6917, "일본 여행", "Japan (Tokyo)")
+    elif destination == "싱가포르":
+        mark(1.3521, 103.8198, "싱가포르 여행", "Singapore")
+    elif destination == "호주":
+        mark(-33.8688, 151.2093, "호주 여행", "Australia (Sydney)")
     else:
-        mark(64.9631, -19.0208, "아이슬란드", "Iceland")
+        mark(40.7128, -74.0060, "뉴욕 여행", "New York")
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.success(f"🧭 이번 희망회로 결과: **{destination} 가능**")

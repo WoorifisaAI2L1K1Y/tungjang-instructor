@@ -9,6 +9,8 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.join(current_dir, '..')
 sys.path.append(parent_dir)
 
+st.set_page_config(page_title="텅장 훈련소", page_icon="💸🪖", layout="wide")
+
 try:
     import utils.handle_sql as handle_sql
 except ImportError:
