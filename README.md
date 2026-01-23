@@ -9,6 +9,59 @@
 [![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT_4o-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com/)
 
+
+
+### 🎬 프롤로그: 어느 예비 훈련생의 입소 계기
+
+<br>
+
+"나는... 멋진 커리어와 재력을 겸비한 **사회초년생**이 되고 싶었다..."
+<br>
+하지만 현실은... 돈이 없어. 💸
+
+<br>
+
+그러던 어느 날, 옆 자리 동료가 최신형 스마트폰을 꺼내 들었다. ✨
+
+<br>
+
+<img src="./images/story_phone1.jpeg" alt="옆사람의 최신 스마트폰" width="500">
+<br>
+<br>
+
+"헐, 부럽다... 나도 폰 바꾸고 싶은데..." (내 폰을 바라보며) 📱🔨
+
+<br>
+
+<img src="./images/story_phone2.jpg" alt="액정이 깨진 내 낡은 폰" width="300">
+
+<br>
+<br>
+
+설레는 마음으로 검색해본 그 폰의 가격은... **1,200,000원** 😱
+
+그리고 처참한 내 수중 잔고... **100,000원** 🥶
+<br>
+"아... 진짜 돈이 필요한데... 방법이 없을까?"
+
+<br>
+
+절망하던 순간, 모니터 구석에서 무언가를 발견했다.
+
+### **[ 🪖 텅장을 구원하고픈 자, 이곳으로 오라! ]**
+
+<br>
+
+"여기라면..! 내 텅장을 구할 수 있을지도 몰라!"
+
+지푸라기라도 잡는 심정으로 입소 신청 버튼을 눌렀고...
+<br>
+**마침내, 악명 높은 '교관'을 마주하게 되는데...**
+
+---
+
+
+
 <br>
 
 > **"본인의 소비에 있어서는 한없이 관대한 우리들,**<br>
