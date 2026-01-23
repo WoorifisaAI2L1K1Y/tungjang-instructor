@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 import sys
+import json
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.join(current_dir, '..')
@@ -26,8 +27,43 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
+# --- [예산 저장 및 로드 함수] ---
+BUDGET_FILE = 'data/budget_settings.json'
+
+if not os.path.exists('data'):
+    os.makedirs('data')
+
+def load_budget():
+    if os.path.exists(BUDGET_FILE):
+        with open(BUDGET_FILE, 'r') as f:
+            try:
+                data = json.load(f)
+                return data.get('budget', 0)
+            except:
+                return 0
+    return 0
+
+def save_budget():
+    new_value = st.session_state['budget_input']
+    with open(BUDGET_FILE, 'w') as f:
+        json.dump({'budget': new_value}, f)
+
 def main():
-    # --- [2. 로고 영역 (작게 유지)] ---
+    # --- [사이드바] 예산 입력 ---
+    with st.sidebar:
+        st.header("💰 예산 설정")
+        saved_budget = load_budget()
+        monthly_budget = st.number_input(
+            "이번 달 목표 예산 (원)",
+            min_value=0, 
+            value=saved_budget, 
+            step=10000,
+            help="예산 관리를 위해 목표 금액을 입력하세요.",
+            key='budget_input',
+            on_change=save_budget
+        )
+
+    # --- [2. 로고 영역] ---
     logo_l, logo_m, logo_r = st.columns([2, 2, 2])
     with logo_m:
         try:
@@ -38,88 +74,101 @@ def main():
     st.markdown("---")
 
     # --- [3. 데이터 분석 로직] ---
-    df_negative = handle_sql.get_data(SQL = """SELECT reason, SUM(cost) AS total_cost
-            FROM sample
-            WHERE date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)
-            AND reason IN (
-                '배달/야식', '카페/간식', '술/유흥', '패션/미용', 
-                '가전/가구', '택시/호출', '데이트/모임', '영화/공연', '여행'
-            )
-            GROUP BY reason
-            WITH ROLLUP""")
+    df_negative = handle_sql.get_data(SQL="""
+                                            SELECT reason, SUM(cost) AS total_cost
+                                            FROM card
+                                            WHERE date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+                                            AND reason IN (
+                                                '배달/야식', '카페/간식', '술/유흥', '패션/미용', 
+                                                '가전/가구', '택시/호출', '데이트/모임', '영화/공연', '여행'
+                                            )
+                                            GROUP BY reason
+                                     """)
     
-    df_all = handle_sql.get_data(SQL="""SELECT reason, SUM(cost) AS total_cost
-            FROM sample
-            WHERE date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)
-            GROUP BY reason
-            WITH ROLLUP""")
+    df_all = handle_sql.get_data(SQL="""
+                                            SELECT reason, SUM(cost) AS total_cost
+                                            FROM card
+                                            WHERE date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+                                            GROUP BY reason
+                                     """)
 
-    # 기본값 초기화
     negative_sum = 0
     total_sum = 0
-    category_msg = "기타"
-
+    
     try:
         if not df_negative.empty:
-            negative_sum = df_negative.iloc[-1]['total_cost']
-            df_sorted = df_negative.iloc[:-1].sort_values(by='total_cost', ascending=False)
-            top_categories = df_sorted['reason'].head(2).tolist()
+            negative_sum = df_negative['total_cost'].sum()
             
-            if len(top_categories) >= 2:
-                category_msg = f"<b>{top_categories[0]}</b>, <b>{top_categories[1]}</b>"
-            elif len(top_categories) == 1:
-                category_msg = f"<b>{top_categories[0]}</b>"
-
         if not df_all.empty:
-            total_sum = df_all.iloc[-1]['total_cost']
+            total_sum = df_all['total_cost'].sum()
 
     except (IndexError, KeyError, Exception) as e:
         st.error(f"데이터 처리 오류: {e}")
         return
 
+    # 기본 낭비율 계산
     negative_percent = (negative_sum / total_sum) * 100 if total_sum > 0 else 0
 
     # --- [4. 조건별 상태 설정] ---
-    if negative_percent <= 20:
-        img_path, bg_color = './images/1-온화.png', "#D4EDDA"
-        status_text = "매우 건전한 소비 생활을 하고 계시네요! 😊"
-    elif negative_percent <= 40:
-        img_path, bg_color = './images/2-걱정.png', "#FFF3CD"
-        status_text = "조금씩 불필요한 지출이 늘고 있어요.<br>주의하세요 😟"
-    elif negative_percent <= 60:
-        img_path, bg_color = './images/3-짜증.png', "#F8D7DA"
-        status_text = f"아~ 슬슬 선을 넘는데요?<br>{category_msg} 좀 줄이세요! 😠"
+    
+    # [조건 A] 예산 미입력 (Default 0)
+    if monthly_budget == 0:
+        img_path = './images/0-궁금.png'
+        bg_color = "#E3F2FD" # 하늘색
+        status_text = "훈련생! 이번 달 예산을 설정하지 않았군.<br>좌측 사이드바에 예산을 입력하게!"
+
+    # [조건 A'] 예산이 너무 적을 때 (0 ~ 10,000원 미만)
+    elif 0 < monthly_budget < 10000:
+        img_path = './images/6-어이없음.png'
+        bg_color = "#FFE0B2"
+        status_text = f"자네 지금 장난하나? {monthly_budget}원으론 <br>돈까스도 못 사 먹네.<br><b>최소 10,000원 이상</b>으로 현실적인 예산을 설정하게!"
+
+    # [조건 B] 예산이 정상적으로 설정되었을 때 (10,000원 이상) -> 예산 소진율 기준 평가
     else:
-        img_path, bg_color = './images/4-화남.png', "#F8D7DA"
-        status_text = f"정신 차리세요!<br>지금 {category_msg}에 돈 쓸 때입니까? 😡"
+        budget_usage_rate = (total_sum / monthly_budget) * 100
+        
+        if budget_usage_rate <= 30:
+            img_path, bg_color = './images/1-온화.png', "#D4EDDA"
+            status_text = f"예산의 {budget_usage_rate:.1f}%만 사용했군.<br>아주 훌륭해! 이 페이스를 유지하게. 😊"
+        elif budget_usage_rate <= 60:
+            img_path, bg_color = './images/2-걱정.png', "#FFF3CD"
+            status_text = f"벌써 예산의 {budget_usage_rate:.1f}% 을 썼네.<br>지출 속도를 조금 늦추는 게 좋겠어. 😟"
+        elif budget_usage_rate <= 90:
+            img_path, bg_color = './images/3-짜증.png', "#F8D7DA"
+            status_text = f"비상! 예산이 거의 바닥났어({budget_usage_rate:.1f}%)!<br>이제부터는 숨만 쉬고 살게! 😠"
+        else:
+            img_path, bg_color = './images/4-화남.png', "#F8D7DA"
+            status_text = f"곧 예산 초과다!!<br>훈련생, 자네는 계획이란 게 없나?! 😡"
 
     # --- [5. 메인 레이아웃 구성] ---
     
-    # 5-1. Info Box 함수 정의 (margin-bottom 추가하여 세로 간격 확보)
-    def info_box(label, value, color="black"):
+    # 박스 스타일 함수
+    def info_box(label, value, color="black", bg_color="white", height="auto"):
         return f"""
         <div style="
-            background-color: white; 
-            padding: 8px; 
+            background-color: {bg_color}; 
+            padding: 10px; 
             border-radius: 8px; 
             text-align: center; 
             box-shadow: 0px 1px 2px rgba(0,0,0,0.1);
             border: 1px solid #eee;
-            margin-bottom: 8px;"> 
-            <p style="font-size: 11px; color: #888; margin: 0;">{label}</p>
-            <p style="font-size: 15px; font-weight: bold; color: {color}; margin: 2px 0 0 0;">{value}</p>
+            margin-bottom: 8px;
+            height: {height};
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            "> 
+            <p style="font-size: 12px; color: #888; margin: 0;">{label}</p>
+            <p style="font-size: 16px; font-weight: bold; color: {color}; margin: 2px 0 0 0;">{value}</p>
         </div>
         """
 
-    # 5-2. 화면 분할 (좌측: 교관 / 우측: 정보박스)
-    # 비율을 [3, 1] 정도로 주어 교관 말풍선 영역을 넓게 확보
-    main_col_left, main_col_right = st.columns([3, 1])
+    # --- [Top Section] 교관(좌) + 기본 정보(우, 세로 스택) ---
+    top_left, top_right = st.columns([3, 1])
 
-    # === [좌측 컬럼: 교관 이미지 + 말풍선] ===
-    with main_col_left:
+    # [좌측] 교관 이미지 + 말풍선
+    with top_left:
         st.markdown("#### 📢 교관의 한마디")
-        
-        # 내부 분할 (이미지 : 말풍선)
         sub_img, sub_bubble = st.columns([1.8, 2.5])
         
         with sub_img:
@@ -129,7 +178,6 @@ def main():
                 st.write("😐")
         
         with sub_bubble:
-            # 말풍선 CSS
             bubble_style = f"""
             <style>
             .speech-bubble {{
@@ -162,15 +210,36 @@ def main():
             st.markdown(bubble_style, unsafe_allow_html=True)
             st.markdown(f'<div class="speech-bubble"><b>{status_text}</b></div>', unsafe_allow_html=True)
 
-    # === [우측 컬럼: 정보 박스 세로 스택] ===
-    with main_col_right:
-        # 타이틀 높이 맞추기 위한 공백 (선택사항)
-        st.markdown("<div style='height: 38px;'></div>", unsafe_allow_html=True)
-        
-        # 박스 3개를 세로로 나열 (별도 컬럼 없이 순서대로 출력)
-        st.markdown(info_box("지난 한 달간 전체 지출", f"{total_sum:,.0f}원"), unsafe_allow_html=True)
-        st.markdown(info_box("지난 한 달간 낭비 지출", f"{negative_sum:,.0f}원", "#dc3545"), unsafe_allow_html=True)
+    # [우측] 기본 정보 3개 (세로 스택 - 항상 표시)
+    with top_right:
+        st.markdown("<div style='height: 38px;'></div>", unsafe_allow_html=True) # 높이 맞춤용
+        st.markdown(info_box("이번 달 전체 소비", f"{total_sum:,.0f}원"), unsafe_allow_html=True)
+        st.markdown(info_box("이번 달 낭비 소비", f"{negative_sum:,.0f}원", "#dc3545"), unsafe_allow_html=True)
         st.markdown(info_box("훈련생의 낭비율", f"{negative_percent:.1f}%", "#dc3545"), unsafe_allow_html=True)
+
+    # --- [Bottom Section] 예산 상세 정보 (1행 3열) ---
+    # 예산이 정상적으로 설정되었을 때만 표시
+    if monthly_budget >= 10000:
+        st.markdown("<br>", unsafe_allow_html=True) # 간격 추가
+        st.markdown("##### 📊 예산 상세 분석")
+        
+        budget_usage_rate = (total_sum / monthly_budget) * 100
+        waste_budget_rate = (negative_sum / monthly_budget) * 100
+        remaining_budget = monthly_budget - total_sum
+        
+        # 3개의 컬럼으로 분할
+        b_col1, b_col2, b_col3 = st.columns(3)
+        
+        with b_col1:
+            usage_color = "#dc3545" if budget_usage_rate > 100 else "#007bff"
+            st.markdown(info_box("예산 소진율", f"{budget_usage_rate:.1f}%", color=usage_color, bg_color="#f8f9fa"), unsafe_allow_html=True)
+            
+        with b_col2:
+            st.markdown(info_box("예산 잠식률 (낭비/예산)", f"{waste_budget_rate:.1f}%", color="#dc3545", bg_color="#f8f9fa"), unsafe_allow_html=True)
+            
+        with b_col3:
+            remain_color = "black" if remaining_budget >= 0 else "#dc3545"
+            st.markdown(info_box("남은 예산 (잔액)", f"{remaining_budget:,.0f}원", color=remain_color, bg_color="#f8f9fa"), unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
