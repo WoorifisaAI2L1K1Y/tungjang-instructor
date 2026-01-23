@@ -5,7 +5,6 @@ import pandas as pd
 import os
 from datetime import datetime, timedelta
 
-
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.join(current_dir, '..')
 sys.path.append(parent_dir)
@@ -15,11 +14,78 @@ try:
 except ImportError:
     st.error("handle_sql.py 파일을 찾을 수 없습니다.")
 
+# 카테고리 구조 정의
+CATEGORY_STRUCTURE = {
+    "식비": ["식자재/장보기", "외식", "배달/야식", "카페/간식", "술/유흥"],
+    "주거/통신": ["월세/관리비", "공과금", "통신비", "구독/OTT"],
+    "생활/쇼핑": ["생활용품", "패션/미용", "가전/가구", "반려동물"],
+    "교통/차량": ["대중교통", "택시/호출", "자차/주유"],
+    "건강/운동": ["병원/약국", "운동/헬스"],
+    "교육/계발": ["도서/문구", "강의/수강"],
+    "관계": ["경조사/선물", "데이트/모임"],
+    "문화/취미": ["영화/공연", "여행"],
+    "금융": ["보험/세금", "저축/투자"]
+}
+
+# 데이터 추가 함수
+def add_expense(date, time, category, reason, cost, memo):
+    try:
+        # handle_sql을 사용하여 데이터 삽입
+        query = """
+        INSERT INTO sample (date, time, category, reason, cost, memo)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        handle_sql.execute_query(query, (date, time, category, reason, cost, memo))
+        return True
+    except Exception as e:
+        st.error(f"데이터 저장 오류: {e}")
+        return False
+
 # 세션 스테이트에 현재 날짜 저장
 if 'current_date' not in st.session_state:
     st.session_state.current_date = datetime.now()
 
-# 월 이동 버튼을 캘린더 위에 배치
+# 사이드바 - 데이터 입력
+st.sidebar.header("📝 지출 내역 입력")
+
+with st.sidebar.form("expense_form"):
+    date = st.date_input("날짜", value=datetime.now())
+    time = st.time_input("시간", value=datetime.now().time())
+    
+    # 대분류 선택
+    category = st.selectbox(
+        "카테고리 (대분류)", 
+        options=list(CATEGORY_STRUCTURE.keys())
+    )
+    
+    # 선택된 대분류에 따른 중분류 옵션
+    reason_options = CATEGORY_STRUCTURE.get(category, [])
+    reason = st.selectbox(
+        "사유 (중분류)",
+        options=reason_options
+    )
+    
+    cost = st.number_input("금액 (원)", min_value=0, step=1000)
+    memo = st.text_input("메모", placeholder="상세 내용을 입력하세요", max_chars=50)
+    
+    submitted = st.form_submit_button("💾 저장", use_container_width=True)
+    
+    if submitted:
+        if add_expense(
+            date.strftime("%Y-%m-%d"),
+            time.strftime("%H:%M:%S"),
+            category,
+            reason,
+            int(cost),
+            memo
+        ):
+            st.success("✅ 저장 완료!")
+            st.rerun()
+
+# 메인 화면 - 데이터 조회
+st.header("📊 지출 내역 조회")
+
+# 월 이동 버튼
 col1, col2, col3 = st.columns([1, 3, 1])
 
 with col1:
@@ -32,7 +98,10 @@ with col1:
         st.rerun()
 
 with col2:
-    st.markdown(f"<h3 style='text-align: center;'>{st.session_state.current_date.year}년 {st.session_state.current_date.month}월</h3>", unsafe_allow_html=True)
+    st.markdown(
+        f"<h3 style='text-align: center;'>{st.session_state.current_date.year}년 {st.session_state.current_date.month}월</h3>", 
+        unsafe_allow_html=True
+    )
 
 with col3:
     if st.button("다음월 ▶", use_container_width=True):
@@ -58,7 +127,7 @@ calendar_events = []
 monthly_total = 0
 daily_stats = {}
 
-# DB 연결 및 데이터 가져오기 (handle_sql 사용)
+# DB 연결 및 데이터 가져오기
 try:
     # 해당 월의 모든 지출 내역 가져오기 쿼리
     query = f"""
@@ -75,19 +144,16 @@ try:
     ORDER BY date, time
     """
     
-    # [변경됨] handle_sql을 통해 DataFrame으로 가져옴
+    # handle_sql을 통해 DataFrame으로 가져옴
     df = handle_sql.get_data(query)
     
     # 데이터가 있을 경우에만 처리
     if not df.empty:
-        # 기존 로직 재사용을 위해 DataFrame을 Dict List로 변환
-        # orient='records'는 [{'col1': val1, ...}, ...] 형태를 만듦
+        # DataFrame을 Dict List로 변환
         results = df.to_dict('records')
         
         # 일별 지출 집계
         for row in results:
-            # Pandas Timestamp 객체일 수 있으므로 strftime 사용
-            # 혹은 문자열일 경우 그대로 사용
             date_val = row['date']
             if isinstance(date_val, (datetime, pd.Timestamp)):
                 event_date = date_val.strftime('%Y-%m-%d')
@@ -147,9 +213,7 @@ try:
 except Exception as e:
     st.error(f"❌ 데이터 조회 오류: {e}")
 
-# --- 이하 UI 코드는 기존과 동일 ---
-
-# 월별 통계 표시
+# CSS 스타일
 st.markdown("""
 <style>
     [data-testid="stMetricValue"] {
@@ -161,6 +225,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# 월별 통계 표시
 st.markdown("---")
 col_a, col_b, col_c = st.columns(3)
 with col_a:
