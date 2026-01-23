@@ -108,7 +108,7 @@ if st.session_state.edit_mode and st.session_state.edit_item:
         curr_cat_idx = category_options.index(orig_cat)
 
 category = st.sidebar.selectbox(
-    "카테고리 (대분류)", 
+    "대분류", 
     options=category_options,
     index=curr_cat_idx
 )
@@ -121,7 +121,7 @@ if st.session_state.edit_mode and st.session_state.edit_item:
     if orig_reason in reason_options:
         curr_reason_idx = reason_options.index(orig_reason)
 
-reason = st.sidebar.selectbox("사유 (중분류)", options=reason_options, index=curr_reason_idx)
+reason = st.sidebar.selectbox("중분류", options=reason_options, index=curr_reason_idx)
 
 # --- 4. 금액 및 메모 ---
 # 금액과 메모는 위젯 재실행 시 초기화되는 문제를 방지하기 위해 
