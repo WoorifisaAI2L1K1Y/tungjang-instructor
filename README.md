@@ -233,20 +233,19 @@ tungjang-instructor/
 프로젝트를 진행하며 마주쳤던 주요 기술적 난관들과 이를 극복한 과정입니다.
 
 ### 1. 기관(Organization) 레포지토리 배포 문제
-* **💣 문제:** 개인 계정이 아닌 교육 기관(Organization) 소유의 레포지토리로 프로젝트를 진행하다 보니, Streamlit Community Cloud 배포 시 권한 문제로 인해 레포지토리를 찾지 못하거나 배포가 거부되는 현상이 발생했습니다.
-* **💡 해결:** Streamlit Cloud 설정 페이지에서 해당 Organization에 대한 **서드파티 접근 권한(Grant Access)**을 승인하고, 배포 권한을 재설정하여 정상적으로 CI/CD 파이프라인을 연결했습니다.
+* **💣 문제:** 개인 계정이 아닌 기관(Organization) 소유의 레포지토리로 프로젝트를 진행하다 보니, Streamlit Community Cloud 배포 시 권한 문제로 인해 레포지토리를 찾지 못했습니다.
+* **💡 해결:** 개인 레포지토리로 fork를 하여 정상적으로 서비스를 배포하였습니다.
 
-### 2. MySQL 데이터베이스와 Streamlit 연동
-* **💣 문제:** 로컬 환경과 달리, 클라우드 배포 환경에서 외부 원격 MySQL 데이터베이스에 안정적으로 접속하고 쿼리를 수행하는 과정에서 연결 타임아웃 등의 이슈가 있었습니다.
-* **💡 해결:** `PyMySQL` 라이브러리를 활용하여 커넥터를 구현하였으며, 쿼리 실행 시마다 커넥션을 안전하게 열고 닫는 함수(`handle_sql.py`)를 모듈화하여 안정성을 확보했습니다.
-
-### 3. 배포 환경에서의 보안 설정 (.env 처리)
+### 2. 배포 환경에서의 보안 설정 (.env 처리)
 * **💣 문제:** 보안을 위해 `.gitignore`에 등록된 `.env` 파일(DB 접속 정보, API Key 등)이 깃허브에 업로드되지 않아, 배포된 서버에서 해당 정보를 불러오지 못하는 문제가 발생했습니다.
-* **💡 해결:** Streamlit Community Cloud 대시보드에서 제공하는 **'Secrets'** 기능을 활용했습니다. 로컬의 `.env` 변수들을 TOML 포맷으로 Secrets 관리창에 등록하여, 코드 변경 없이도 프로덕션 환경에서 안전하게 환경 변수를 로드하도록 구성했습니다.
+* **💡 해결:** Streamlit Community Cloud 대시보드에서 제공하는 **'Secrets'** 기능을 활용했습니다. 로컬의 `.env` 변수들을 Secrets 관리창에 등록하여, 안전하게 환경 변수를 로드하도록 구성했습니다.
 
-### 4. 데이터 수정 및 삭제(CRUD) 기능 구현
-* **💣 문제:** Streamlit은 상호작용(Interaction) 발생 시 전체 스크립트가 리런(Rerun)되는 구조를 가지고 있어, 특정 데이터를 선택해 수정하거나 삭제한 뒤 그 상태를 유지하고 UI에 즉시 반영하는 로직 구현이 까다로웠습니다.
-* **💡 해결:** 각 데이터의 **Primary Key(ID)**를 식별자로 활용해 정확한 타겟을 `DELETE` 또는 `UPDATE` 하도록 SQL 로직을 짰으며, 트랜잭션 완료 후 즉시 `st.rerun()`을 호출하여 사용자가 새로고침 없이도 변경된 데이터를 바로 확인할 수 있도록 구현했습니다.
+### 3. 데이터 수정 및 삭제(CRUD) 기능 구현
+* **💣 문제:** st.data_editor 만으로는 DB와 실시간 동기화(Sync)를 구현하기 까다로웠고, 수정/삭제 직후 화면에 반영되지 않아 사용자가 새로고침을 해야 하는 불편함이 있었습니다.
+* **💡 해결:**
+    - **수정(Update)**: 캘린더의 이벤트를 클릭하면 기존 데이터를 st.session_state로 불러와 입력 폼(Form)에 채워 넣는 방식을 구현했습니다.
+    - **삭제(Delete)**: 각 항목 옆에 삭제 버튼을 배치하고, 콜백 함수(on_click)를 사용하여 DB에서 삭제 쿼리를 실행했습니다.
+    - **동기화**: DB 작업(INSERT/UPDATE/DELETE) 성공 시 st.cache_data.clear()로 캐시를 비우고 st.rerun()을 호출하거나 폼 초기화 콜백을 실행하여, 변경 사항이 즉시 화면(캘린더 및 리스트)에 반영되도록 로직을 개선했습니다.
 ---
 
 ## 🛠 기술 스택 (Tech Stack)
@@ -267,7 +266,7 @@ tungjang-instructor/
 훈련을 시작하려면 아래 절차를 따르십시오.
 
 ### 1. 환경 설정 (Prerequisites)
-* Python 3.9 이상
+* Python 3.11 이상
 * MySQL Database
 
 ### 2. 설치 (Installation)
@@ -281,8 +280,6 @@ cd tungjang-instructor
 # 필수 패키지 설치
 pip install -r requirements.txt
 
-# 실행 (local 시)
-streamlit run main.py
 # 실행 (local 시)
 streamlit run main.py
 ```
