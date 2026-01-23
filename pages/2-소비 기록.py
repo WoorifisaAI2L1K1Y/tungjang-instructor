@@ -45,43 +45,43 @@ def add_expense(date, time, category, reason, cost, memo):
 if 'current_date' not in st.session_state:
     st.session_state.current_date = datetime.now()
 
-# 사이드바 - 데이터 입력
 st.sidebar.header("📝 지출 내역 입력")
 
-with st.sidebar.form("expense_form"):
-    date = st.date_input("날짜", value=datetime.now())
-    time = st.time_input("시간", value=datetime.now().time())
-    
-    # 대분류 선택
-    category = st.selectbox(
-        "카테고리 (대분류)", 
-        options=list(CATEGORY_STRUCTURE.keys())
-    )
-    
-    # 선택된 대분류에 따른 중분류 옵션
-    reason_options = CATEGORY_STRUCTURE.get(category, [])
-    reason = st.selectbox(
-        "사유 (중분류)",
-        options=reason_options
-    )
-    
-    cost = st.number_input("금액 (원)", min_value=0, step=1000)
-    memo = st.text_input("메모", placeholder="상세 내용을 입력하세요", max_chars=50)
-    
-    submitted = st.form_submit_button("💾 저장", use_container_width=True)
-    
-    if submitted:
-        if add_expense(
-            date.strftime("%Y-%m-%d"),
-            time.strftime("%H:%M:%S"),
-            category,
-            reason,
-            int(cost),
-            memo
-        ):
-            st.success("✅ 저장 완료!")
-            st.rerun()
+# 1. 날짜/시간 입력
+date = st.sidebar.date_input("날짜", value=datetime.now())
+time = st.sidebar.time_input("시간", value=datetime.now().time())
 
+# 2. 대분류 선택 (값이 바뀌면 즉시 스크립트가 재실행되어 아래 로직에 반영됨)
+category = st.sidebar.selectbox(
+    "카테고리 (대분류)", 
+    options=list(CATEGORY_STRUCTURE.keys())
+)
+
+# 3. 중분류 선택 (선택된 대분류에 맞춰 목록 갱신)
+reason_options = CATEGORY_STRUCTURE.get(category, [])
+reason = st.sidebar.selectbox(
+    "사유 (중분류)",
+    options=reason_options
+)
+
+# 4. 금액 및 메모
+cost = st.sidebar.number_input("금액 (원)", min_value=0, step=1000)
+memo = st.sidebar.text_input("메모", placeholder="상세 내용을 입력하세요", max_chars=50)
+
+# 5. 저장 버튼 (일반 버튼 사용)
+if st.sidebar.button("💾 저장", use_container_width=True):
+    if add_expense(
+        date.strftime("%Y-%m-%d"),
+        time.strftime("%H:%M:%S"),
+        category,
+        reason,
+        int(cost),
+        memo
+    ):
+        st.sidebar.success("✅ 저장 완료!")
+        st.rerun()
+
+        
 # 메인 화면 - 데이터 조회
 st.header("📊 지출 내역 조회")
 
